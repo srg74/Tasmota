@@ -155,9 +155,8 @@ void IrReceiveCheck(void)
       }
 
       ResponseJsonEndEnd();
-      MqttPublishPrefixTopic_P(RESULT_OR_TELE, PSTR(D_JSON_IRRECEIVED));
+      MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_TELE, PSTR(D_JSON_IRRECEIVED));
 
-      XdrvRulesProcess();
 #ifdef USE_DOMOTICZ
       if (iridx) {
         unsigned long value = results.value | (iridx << 28);  // [Protocol:4, Data:28]
@@ -181,6 +180,7 @@ uint32_t IrRemoteCmndIrSendJson(void)
   // IRsend { "protocol": "RC5", "bits": 12, "data":"0xC86" }
   // IRsend { "protocol": "SAMSUNG", "bits": 32, "data": 551502015 }
 
+#if 0
   char dataBufUc[XdrvMailbox.data_len + 1];
   UpperCase(dataBufUc, XdrvMailbox.data);
   RemoveSpace(dataBufUc);
@@ -201,6 +201,19 @@ uint32_t IrRemoteCmndIrSendJson(void)
   uint16_t bits = root[UpperCase_P(parm_uc, PSTR(D_JSON_IR_BITS))];
   uint64_t data = strtoull(root[UpperCase_P(parm_uc, PSTR(D_JSON_IR_DATA))], nullptr, 0);
   uint16_t repeat = root[UpperCase_P(parm_uc, PSTR(D_JSON_IR_REPEAT))];
+#else
+  RemoveSpace(XdrvMailbox.data);    // TODO is this really needed?
+  JsonParser parser(XdrvMailbox.data);
+  JsonParserObject root = parser.getRootObject();
+  if (!root) { return IE_INVALID_JSON; }
+
+  // IRsend { "protocol": "SAMSUNG", "bits": 32, "data": 551502015 }
+  // IRsend { "protocol": "NEC", "bits": 32, "data":"0x02FDFE80", "repeat": 2 }
+  const char *protocol = root.getStr(PSTR(D_JSON_IR_PROTOCOL), "");
+  uint16_t bits = root.getUInt(PSTR(D_JSON_IR_BITS), 0);
+  uint64_t data = root.getULong(PSTR(D_JSON_IR_DATA), 0);
+  uint16_t repeat = root.getUInt(PSTR(D_JSON_IR_REPEAT), 0);
+#endif
   // check if the IRSend<x> is great than repeat
   if (XdrvMailbox.index > repeat + 1) {
     repeat = XdrvMailbox.index - 1;

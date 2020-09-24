@@ -35,19 +35,21 @@ char EscapeJSONChar(char c) {
 }
 
 String EscapeJSONString(const char *str) {
+  // As this function is used in ResponseCmndChar() and ResponseCmndIdxChar()
+  // it needs to be PROGMEM safe!
   String r("");
   if (nullptr == str) { return r; }
 
   bool needs_escape = false;
   size_t len_out = 1;
-  const char * c = str;
-
-  while (*c) {
-    if (EscapeJSONChar(*c)) {
+  const char* c = str;
+  char ch = '.';
+  while (ch != '\0') {
+    ch = pgm_read_byte(c++);
+    if (EscapeJSONChar(ch)) {
       len_out++;
       needs_escape = true;
     }
-    c++;
     len_out++;
   }
 
@@ -57,20 +59,21 @@ String EscapeJSONString(const char *str) {
     r.reserve(len_out);
     c = str;
     char *d = r.begin();
-    while (*c) {
-      char c2 = EscapeJSONChar(*c);
+    char ch = '.';
+    while (ch != '\0') {
+      ch = pgm_read_byte(c++);
+      char c2 = EscapeJSONChar(ch);
       if (c2) {
-        c++;
         *d++ = '\\';
         *d++ = c2;
       } else {
-        *d++ = *c++;
+        *d++ = ch;
       }
     }
     *d = 0;   // add NULL terminator
     r = (char*) r.begin();      // assign the buffer to the string
   } else {
-    r = str;
+    r = FPSTR(str);
   }
 
   return r;
@@ -85,11 +88,12 @@ String EscapeJSONString(const char *str) {
 //
 // If the key is not found, returns a nullptr
 // Input: needle cannot be NULL but may be PROGMEM
+#if 0
 const JsonVariant &GetCaseInsensitive(const JsonObject &json, const char *needle) {
   // key can be in PROGMEM
   // if needle == "?" then we return the first valid key
   bool wildcard = strcmp_P("?", needle) == 0;
-  if ((nullptr == &json) || (nullptr == needle) || (0 == pgm_read_byte(needle))) {
+  if ((nullptr == &json) || (nullptr == needle) || (0 == pgm_read_byte(needle)) || (!json.success())) {
     return *(JsonVariant*)nullptr;
   }
 
@@ -104,3 +108,10 @@ const JsonVariant &GetCaseInsensitive(const JsonObject &json, const char *needle
   // if not found
   return *(JsonVariant*)nullptr;
 }
+
+// This function returns true if the JsonObject contains the specified key
+// It's just a wrapper to the previous function but it can be tricky to test nullptr on an object ref
+bool HasKeyCaseInsensitive(const JsonObject &json, const char *needle) {
+  return &GetCaseInsensitive(json, needle) != nullptr;
+}
+#endif
