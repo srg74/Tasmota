@@ -9,19 +9,23 @@ See [migration path](https://tasmota.github.io/docs/Upgrading#migration-path) fo
 1. Migrate to **Sonoff-Tasmota 3.9.x**
 2. Migrate to **Sonoff-Tasmota 4.x**
 3. Migrate to **Sonoff-Tasmota 5.14**
-4. Migrate to **Sonoff-Tasmota 6.x**
-5. Migrate to **Tasmota 7.x**
+4. Migrate to **Sonoff-Tasmota 6.7.1**
+5. Migrate to **Tasmota 7.2.0**
 
 --- Major change in parameter storage layout ---
 
 6. Migrate to **Tasmota 8.1**
-7. Migrate to **Tasmota 8.x**
+7. Migrate to **Tasmota 8.5.1**
 
-While fallback or downgrading is common practice it was never supported due to Settings additions or changes in newer releases. Starting with release **v8.1.0 Doris** the Settings are re-allocated in such a way that fallback is only allowed and possible to release **v7.2.0 Constance**. Once at v7.2.0 you're on your own when downgrading even further.
+--- Major change in internal GPIO function representation ---
+
+8. Migrate to **Tasmota 9.1**
+
+While fallback or downgrading is common practice it was never supported due to Settings additions or changes in newer releases. Starting with release **v9.1.0 Imogen** the internal GPIO function representation has changed in such a way that fallback is only possible to the latest GPIO configuration before installing **v9.1.0**.
 
 ## Supported Core versions
 
-This release will be supported from ESP8266/Arduino library Core version **2.7.4.1** due to reported security and stability issues on previous Core version. This will also support gzipped binaries.
+This release will be supported from ESP8266/Arduino library Core version **2.7.4.5** due to reported security and stability issues on previous Core version. This will also support gzipped binaries.
 
 Support of Core versions before 2.7.1 has been removed.
 
@@ -35,7 +39,7 @@ For initial configuration this release supports Webserver based **WifiManager** 
 
 ## Provided Binary Downloads
 
-The following binary downloads have been compiled with ESP8266/Arduino library core version **2.7.4.1**.
+The following binary downloads have been compiled with ESP8266/Arduino library core version **2.7.4.5**.
 
 - **tasmota.bin** = The Tasmota version with most drivers. **RECOMMENDED RELEASE BINARY**
 - **tasmota-BG.bin** to **tasmota-TW.bin** = The Tasmota version in different languages.
@@ -47,38 +51,87 @@ The following binary downloads have been compiled with ESP8266/Arduino library c
 - **tasmota-zbbridge.bin** = The dedicated Sonoff Zigbee Bridge version.
 - **tasmota-minimal.bin** = The Minimal version allows intermediate OTA uploads to support larger versions and does NOT change any persistent parameter. This version **should NOT be used for initial installation**.
 
-The attached binaries can also be downloaded from http://ota.tasmota.com/tasmota/release for ESP8266 or http://ota.tasmota.com/tasmota32/release for ESP32. The links can be used for OTA upgrades too like ``OtaUrl http://ota.tasmota.com/tasmota/release/tasmota.bin``
+The attached binaries can also be downloaded from http://ota.tasmota.com/tasmota/release for ESP8266 or http://ota.tasmota.com/tasmota32/release for ESP32. The links can be used for OTA upgrades too like ``OtaUrl http://ota.tasmota.com/tasmota/release/tasmota.bin.gz``
 
 [List](MODULES.md) of embedded modules.
 
 [Complete list](BUILDS.md) of available feature and sensors.
 
-## Changelog
+## Changelog v9.1.0 Imogen
+### Added
+- Command ``DimmerStep 1..50`` to change default dimmer up and down step of 10% by James Turton (#9733)
+- Command ``Gpios 255`` to show all possible GPIO configurations
+- Command ``NoDelay`` for immediate backlog command execution by Erik Montnemery (#9544)
+- Command ``ShutterChange`` to increment change position (#9594)
+- Command ``SwitchMode 15`` sending only MQTT message on switch change (#9593)
+- Command ``SetOption113 1`` to set dimmer low on rotary dial after power off
+- Command ``SetOption114 1`` to detach Switches from Relays and enable MQTT action state for all the SwitchModes
+- Command ``SwitchText`` to change JSON switch names by barbudor (#9691)
+- Zigbee command ``ZbData`` for better support of device specific data
+- Zigbee command ``ZbOccupancy`` to configure the time-out for PIR
+- Optional support for Mitsubishi Electric HVAC by David Gwynne (#9237)
+- Optional support for Orno WE517-Modbus energy meter by Maxime Vincent (#9353)
+- SDM630 three phase ImportActive Energy display when ``#define SDM630_IMPORT`` is enabled by Janusz Kostorz (#9124)
+- Optional support for inverted NeoPixelBus data line by enabling ``#define USE_WS2812_INVERTED`` (#8988)
+- Support for PWM dimmer color/trigger on tap, SO88 led, DGR WITH_LOCAL flag, multi-press and ledmask by Paul Diem (#9474, #9584)
+- Support for stateful ACs using ``StateMode`` in tasmota-ir.bin by Arik Yavilevich (#9472)
+- Support for analog buttons indexed within standard button range
+- Support for Vietnamese language translations by Tâm.NT
+- Support for timers in case of no-sunset permanent day by cybermaus (#9543)
+- Support for EZO sensors by Christopher Tremblay
+- Support for fixed output Hi or Lo GPIO selection
+- Support for Hass discovery of TuyaMcu and Sonoff Ifan by Federico Leoni (#9727)
+- TLS in binary tasmota-zbbridge (#9620)
+- Zigbee reduce battery drain (#9642)
+- ESP32 support for Wireless-Tag WT32-ETH01 (#9496)
+- ESP32 MI32 Beacon support, RSSI at TELEPERIOD, refactoring by Christian Baars (#9609)
+- HM10 Beacon support and refactoring by Christian Baars (#9702)
+- Initial support for iBeacons (Sensor52) on ESP32 using internal BLE by rvbglas (#9732)
 
-### Version 8.5.0 Hannah
+### Breaking Changed
+- Redesigned ESP8266 GPIO internal representation in line with ESP32 changing ``Template`` layout too
+- TLS fingerprint ``#define MQTT_FINGERPRINT`` from string to hexnumbers (#9570)
+- Command ``Status`` output for disabled status types now returns {"Command":"Error"}
+- MAX31865 driver to support up to 6 thermocouples selected by ``MX31865 CS`` instead of ``SSPI CS`` (#9103)
+- When ``SetOption73 1`` JSON result from `{"ACTION":"SINGLE"}` to `{"Button1":{"Action":"SINGLE"}}`
 
-- Remove support for direct upgrade from versions before 6.6.0.11 to versions after 8.4.0.1
-- Change references from http://thehackbox.org/tasmota/ to http://ota.tasmota.com/tasmota/
-- Change triple-mode TLS via configuration in a single firmware (TLS AWS IoT, Letsencrypt and No-TLS)
-- Change White blend mode to using command ``SetOption 105`` instead of ``RGBWWTable``
-- Fix ESP32 PWM range
-- Fix display power control (#9114)
-- Fix energy total counters (#9263, #9266)
-- Add command ``SetOption102 0/1`` to set Baud rate for Teleinfo communication (0 = 1200 or 1 = 9600)
-- Add command ``SetOption103 0/1`` to set TLS mode when TLS is selected
-- Add command ``SetOption104 1`` to disable all MQTT retained messages
-- Add command ``SetOption106 1`` to create a virtual White ColorTemp for RGBW lights
-- Add command ``SetOption107 0/1`` to select virtual White as (0) Warm or (1) Cold
-- Add command ``SetOption108 0/1`` to enable Teleinfo telemetry into Tasmota Energy MQTT (0) or Teleinfo only (1)
-- Add command ``SetOption109 1`` to force gen1 Alexa mode, for Echo Dot 2nd gen devices only
-- Add command ``Restart 2`` to halt system. Needs hardware reset or power cycle to restart (#9046)
-- Add command ``PowerDelta1`` to ``PowerDelta3`` to trigger on up to three phases (#9134)
-- Add Zigbee options to ``ZbSend`` ``Config`` and ``ReadCondig``
-- Add Zigbee better support for IKEA Motion Sensor
-- Add Zigbee web gui widget for Battery and Temp/Humidity/Pressure sensors
-- Add Zigbee web ui for power metering plugs
-- Add better configuration corruption recovery (#9046)
-- Add virtual CT for 4 channels lights, emulating a 5th channel
-- Add support for DYP ME007 ultrasonic distance sensor by Janusz Kostorz (#9113)
-- Add ESP32 Analog input support for GPIO32 to GPIO39
-- Add experimental support for ESP32 TTGO Watch and I2S Audio by Gerhard Mutz
+### Changed
+- Command ``Gpio17`` replaces command ``Adc``
+- Command ``Gpios`` replaces command ``Adcs``
+- New IR Raw compact format (#9444)
+- A4988 optional microstep pin selection
+- Pulsetime to allow use for all relays with 8 interleaved so ``Pulsetime1`` is valid for Relay1, Relay9, Relay17 etc. (#9279)
+- Management of serial baudrate (#9554)
+- Rotary driver adjusted accordingly if Mi Desk Lamp module is selected (#9399)
+- Tasmota Arduino Core v2.7.4.5 allowing webpassword over 47 characters (#9687)
+- Webserver code optimizations (#9580, #9590)
+- PlatformIO library structure redesigned for compilation speed by Jason2866
+- Zigbee flash storage refactor adding commands ``ZbProbe``, ``ZbStatus2`` and ``ZbRestore`` (#9641)
+- Default otaurl in my_user_config.h to http://ota.tasmota.com/tasmota/release/tasmota.bin.gz
+- IRremoteESP8266 library from v2.7.10 to v2.7.11
+- NeoPixelBus library from v2.5.0.09 to v2.6.0
+
+### Fixed
+- Light wakeup Exception 0 (divide by zero) when ``WakeupDuration`` is not initialised (#9466)
+- Exception 28 due to device group buffer overflow (#9459)
+- Arilux RF remote detection regression from v8.3.0
+- Ledlink blink when no network connected regression from v8.3.1.4 (#9292)
+- TuyaMcu energy display regression from v8.5.0.1 (#9547)
+- Thermostat sensor status corruption regression from v8.5.0.1 (#9449)
+- Telegram message decoding error regression from v8.5.0.1
+- Rule handling of Var or Mem using text regression from v8.5.0.1 (#9540)
+- Rule handling of JSON ``null`` regression from v8.5.0.1 (#9685)
+- Rule Break not working as expected when ONCE is enabled (#9245)
+- Rule expressions using mems corrupts character pool (#9301)
+- Shutter timing problem due to buffer overflow in calibration matrix (#9458)
+- Correct Energy period display shortly after midnight by gominoa (#9536)
+- Tuyamcu dimmers MQTT topic (#9606)
+- Scripter memory alignment (#9608)
+- Zigbee battery percentage (#9607)
+- HassAnyKey anomaly (#9601)
+
+### Removed
+- Support for direct upgrade from Tasmota versions before v7.0
+- Support for downgrade to versions before 9.0 keeping current GPIO configuration
+- Auto config update for all Friendlynames and Switchtopic from Tasmota versions before v8.0
+- Auto output selection of decimal or hexadecimal data based on user input. Now only based on ``SetOption17``

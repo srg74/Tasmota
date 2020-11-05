@@ -112,7 +112,7 @@ void DomoticzUpdateFanState(void) {
 void MqttPublishDomoticzPowerState(uint8_t device) {
   if (Settings.flag.mqtt_enabled) {  // SetOption3 - Enable MQTT
     if (device < 1) { device = 1; }
-    if ((device > devices_present) || (device > MAX_DOMOTICZ_IDX)) { return; }
+    if ((device > TasmotaGlobal.devices_present) || (device > MAX_DOMOTICZ_IDX)) { return; }
     if (Settings.domoticz_relay_idx[device -1]) {
 #ifdef USE_SHUTTER
       if (domoticz_is_shutter) {
@@ -127,7 +127,7 @@ void MqttPublishDomoticzPowerState(uint8_t device) {
         char svalue[8];  // Dimmer value
 
         snprintf_P(svalue, sizeof(svalue), PSTR("%d"), Settings.light_dimmer);
-        Response_P(DOMOTICZ_MESSAGE, (int)Settings.domoticz_relay_idx[device -1], (power & (1 << (device -1))) ? 1 : 0, (light_type) ? svalue : "", DomoticzBatteryQuality(), DomoticzRssiQuality());
+        Response_P(DOMOTICZ_MESSAGE, (int)Settings.domoticz_relay_idx[device -1], (TasmotaGlobal.power & (1 << (device -1))) ? 1 : 0, (TasmotaGlobal.light_type) ? svalue : "", DomoticzBatteryQuality(), DomoticzRssiQuality());
         MqttPublish(domoticz_in_topic);
 #ifdef USE_SONOFF_IFAN
       }
@@ -151,7 +151,7 @@ void DomoticzMqttUpdate(void) {
     domoticz_update_timer--;
     if (domoticz_update_timer <= 0) {
       domoticz_update_timer = Settings.domoticz_update_timer;
-      for (uint32_t i = 1; i <= devices_present; i++) {
+      for (uint32_t i = 1; i <= TasmotaGlobal.devices_present; i++) {
 #ifdef USE_SHUTTER
         if (domoticz_is_shutter)
         {
@@ -175,7 +175,7 @@ void DomoticzMqttUpdate(void) {
 }
 
 void DomoticzMqttSubscribe(void) {
-  uint8_t maxdev = (devices_present > MAX_DOMOTICZ_IDX) ? MAX_DOMOTICZ_IDX : devices_present;
+  uint8_t maxdev = (TasmotaGlobal.devices_present > MAX_DOMOTICZ_IDX) ? MAX_DOMOTICZ_IDX : TasmotaGlobal.devices_present;
   for (uint32_t i = 0; i < maxdev; i++) {
     if (Settings.domoticz_relay_idx[i]) {
       domoticz_subscribe = true;
@@ -189,33 +189,13 @@ void DomoticzMqttSubscribe(void) {
   }
 }
 
-/*
- * ArduinoJSON Domoticz Switch entry used to calculate jsonBuf: JSON_OBJECT_SIZE(11) + 129 = 313
-{
-   "Battery" : 255,
-   "RSSI" : 12,
-   "dtype" : "Light/Switch",
-   "id" : "000140E7",
-   "idx" : 159,
-   "name" : "Sonoff1",
-   "nvalue" : 1,
-   "stype" : "Switch",
-   "svalue1" : "0",
-   "switchType" : "Dimmer",
-   "unit" : 1
-}
- * Fail on this one
-{
-   "LastUpdate" : "2018-10-02 20:39:45",
-   "Name" : "Sfeerverlichting",
-   "Status" : "Off",
-   "Timers" : "true",
-   "Type" : "Group",
-   "idx" : "2"
-}
-*/
-
 bool DomoticzMqttData(void) {
+/*
+  XdrvMailbox.topic = topic;
+  XdrvMailbox.index = strlen(topic);
+  XdrvMailbox.data = (char*)data;
+  XdrvMailbox.data_len = data_len;
+*/
   domoticz_update_flag = true;
 
   if (strncasecmp_P(XdrvMailbox.topic, PSTR(DOMOTICZ_OUT_TOPIC), strlen(DOMOTICZ_OUT_TOPIC)) != 0) {
@@ -226,41 +206,39 @@ bool DomoticzMqttData(void) {
   if (XdrvMailbox.data_len < 20) {
     return true;  // No valid data
   }
-  StaticJsonBuffer<400> jsonBuf;
-  JsonObject& domoticz = jsonBuf.parseObject(XdrvMailbox.data);
-  if (!domoticz.success()) {
+
+  String domoticz_data = XdrvMailbox.data;  // Copy the string into a new buffer that will be modified
+  JsonParser parser((char*)domoticz_data.c_str());
+  JsonParserObject domoticz = parser.getRootObject();
+  if (!domoticz) {
     return true;  // To much or invalid data
   }
 //    if (strcmp_P(domoticz["dtype"],PSTR("Light/Switch"))) {
 //      return true;
 //    }
-  uint32_t idx = domoticz["idx"];
-  int16_t nvalue = -1;
-  if (domoticz.containsKey("nvalue")) {
-    nvalue = domoticz["nvalue"];
-  }
+  uint32_t idx = domoticz.getUInt(PSTR("idx"), 0);
+  int16_t nvalue = domoticz.getInt(PSTR("nvalue"), -1);
 
   AddLog_P2(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_DOMOTICZ "idx %d, nvalue %d"), idx, nvalue);
 
   bool found = false;
   if ((idx > 0) && (nvalue >= 0) && (nvalue <= 15)) {
-    uint8_t maxdev = (devices_present > MAX_DOMOTICZ_IDX) ? MAX_DOMOTICZ_IDX : devices_present;
+    uint8_t maxdev = (TasmotaGlobal.devices_present > MAX_DOMOTICZ_IDX) ? MAX_DOMOTICZ_IDX : TasmotaGlobal.devices_present;
     for (uint32_t i = 0; i < maxdev; i++) {
       if (idx == Settings.domoticz_relay_idx[i]) {
-        bool iscolordimmer = strcmp_P(domoticz["dtype"],PSTR("Color Switch")) == 0;
-        bool isShutter = strcmp_P(domoticz["dtype"],PSTR("Light/Switch")) == 0 & strncmp_P(domoticz["switchType"],PSTR("Blinds"), 6) == 0;
+        bool iscolordimmer = strcmp_P(domoticz.getStr(PSTR("dtype")), PSTR("Color Switch")) == 0;
+        bool isShutter = strcmp_P(domoticz.getStr(PSTR("dtype")), PSTR("Light/Switch")) == 0 & strncmp_P(domoticz.getStr(PSTR("switchType")),PSTR("Blinds"), 6) == 0;
 
         char stemp1[10];
         snprintf_P(stemp1, sizeof(stemp1), PSTR("%d"), i +1);
 #ifdef USE_SONOFF_IFAN
         if (IsModuleIfan() && (1 == i)) {  // Idx 2 is fanspeed
-          uint8_t svalue = 0;
-          if (domoticz.containsKey("svalue1")) {
-            svalue = domoticz["svalue1"];
-          } else {
-            return true;  // Invalid data
+          JsonParserToken svalue_tok = domoticz[PSTR("svalue1")];
+          if (!svalue_tok) {
+            return true;
           }
-          svalue = (nvalue == 2) ? svalue / 10 : 0;
+          uint8_t svalue = svalue_tok.getUInt();
+          svalue = (2 == nvalue) ? svalue / 10 : 0;
           if (GetFanspeed() == svalue) {
             return true;  // Stop loop as already set
           }
@@ -273,18 +251,10 @@ bool DomoticzMqttData(void) {
         } else
 #endif  // USE_SONOFF_IFAN
 #ifdef USE_SHUTTER
-        if (isShutter)
-        {
-          if (domoticz.containsKey("nvalue")) {
-            nvalue = domoticz["nvalue"];
-          }
-
-          uint8_t position = 0;
-          if (domoticz.containsKey("svalue1")) {
-            position = domoticz["svalue1"];
-          }
+        if (isShutter) {
+          uint8_t position = domoticz.getUInt(PSTR("svalue1"), 0);
           if (nvalue != 2) {
-            position = nvalue == 0 ? 0 : 100;
+            position = (0 == nvalue) ? 0 : 100;
           }
 
           snprintf_P(XdrvMailbox.topic, TOPSZ, PSTR("/" D_PRFX_SHUTTER D_CMND_SHUTTER_POSITION));
@@ -297,19 +267,16 @@ bool DomoticzMqttData(void) {
 #ifdef USE_LIGHT
         if (iscolordimmer && 10 == nvalue) {  // Color_SetColor
           // https://www.domoticz.com/wiki/Domoticz_API/JSON_URL%27s#Set_a_light_to_a_certain_color_or_color_temperature
-          JsonObject& color = domoticz["Color"];
-          uint16_t level = nvalue = domoticz["svalue1"];
-          uint16_t r = color["r"]; r = r * level / 100;
-          uint16_t g = color["g"]; g = g * level / 100;
-          uint16_t b = color["b"]; b = b * level / 100;
-          uint16_t cw = color["cw"]; cw = cw * level / 100;
-          uint16_t ww = color["ww"]; ww = ww * level / 100;
-          uint16_t m = 0;
-          uint16_t t = 0;
-          if (color.containsKey("m")) {
-            m = color["m"];
-            t = color["t"];
-          }
+          JsonParserObject color = domoticz[PSTR("Color")].getObject();
+          // JsonObject& color = domoticz["Color"];
+          uint16_t level = nvalue = domoticz.getUInt(PSTR("svalue1"), 0);
+          uint16_t r = color.getUInt(PSTR("r"), 0) * level / 100;
+          uint16_t g = color.getUInt(PSTR("g"), 0) * level / 100;
+          uint16_t b = color.getUInt(PSTR("b"), 0) * level / 100;
+          uint16_t cw = color.getUInt(PSTR("cw"), 0) * level / 100;
+          uint16_t ww = color.getUInt(PSTR("ww"), 0) * level / 100;
+          uint16_t m = color.getUInt(PSTR("m"), 0);
+          uint16_t t = color.getUInt(PSTR("t"), 0);
           if (2 == m) {  // White with color temperature. Valid fields: t
             snprintf_P(XdrvMailbox.topic, XdrvMailbox.index, PSTR("/" D_CMND_BACKLOG));
             snprintf_P(XdrvMailbox.data, XdrvMailbox.data_len, PSTR(D_CMND_COLORTEMPERATURE " %d;" D_CMND_DIMMER " %d"), changeUIntScale(t, 0, 255, CT_MIN, CT_MAX), level);
@@ -321,12 +288,12 @@ bool DomoticzMqttData(void) {
         }
         else if ((!iscolordimmer && 2 == nvalue) ||  // gswitch_sSetLevel
                   (iscolordimmer && 15 == nvalue)) {  // Color_SetBrightnessLevel
-          if (domoticz.containsKey("svalue1")) {
-            nvalue = domoticz["svalue1"];
+          if (domoticz[PSTR("svalue1")]) {
+            nvalue = domoticz.getUInt(PSTR("svalue1"), 0);
           } else {
             return true;  // Invalid data
           }
-          if (light_type && (Settings.light_dimmer == nvalue) && ((power >> i) &1)) {
+          if (TasmotaGlobal.light_type && (Settings.light_dimmer == nvalue) && ((TasmotaGlobal.power >> i) &1)) {
             return true;  // State already set
           }
           snprintf_P(XdrvMailbox.topic, XdrvMailbox.index, PSTR("/" D_CMND_DIMMER));
@@ -335,10 +302,10 @@ bool DomoticzMqttData(void) {
         } else
 #endif  // USE_LIGHT
         if (1 == nvalue || 0 == nvalue) {
-          if (((power >> i) &1) == (power_t)nvalue) {
+          if (((TasmotaGlobal.power >> i) &1) == (power_t)nvalue) {
             return true;  // Stop loop
           }
-          snprintf_P(XdrvMailbox.topic, XdrvMailbox.index, PSTR("/" D_CMND_POWER "%s"), (devices_present > 1) ? stemp1 : "");
+          snprintf_P(XdrvMailbox.topic, XdrvMailbox.index, PSTR("/" D_CMND_POWER "%s"), (TasmotaGlobal.devices_present > 1) ? stemp1 : "");
           snprintf_P(XdrvMailbox.data, XdrvMailbox.data_len, PSTR("%d"), nvalue);
           found = true;
         }
@@ -414,9 +381,9 @@ void DomoticzSensor(uint8_t idx, char *data) {
   if (Settings.domoticz_sensor_idx[idx]) {
     char dmess[128];  // {"idx":26700,"nvalue":0,"svalue":"22330.1;10234.4;22000.5;10243.4;1006;3000","Battery":100,"RSSI":10}
 
-    memcpy(dmess, mqtt_data, sizeof(dmess));
+    memcpy(dmess, TasmotaGlobal.mqtt_data, sizeof(dmess));
     DomoticzSendData(idx, Settings.domoticz_sensor_idx[idx], data);
-    memcpy(mqtt_data, dmess, sizeof(dmess));
+    memcpy(TasmotaGlobal.mqtt_data, dmess, sizeof(dmess));
   }
 }
 
@@ -481,7 +448,7 @@ void CmndDomoticzIdx(void) {
   if ((XdrvMailbox.index > 0) && (XdrvMailbox.index <= MAX_DOMOTICZ_IDX)) {
     if (XdrvMailbox.payload >= 0) {
       Settings.domoticz_relay_idx[XdrvMailbox.index -1] = XdrvMailbox.payload;
-      restart_flag = 2;
+      TasmotaGlobal.restart_flag = 2;
     }
     ResponseCmndIdxNumber(Settings.domoticz_relay_idx[XdrvMailbox.index -1]);
   }
@@ -530,7 +497,7 @@ void CmndDomoticzSend(void) {
 
   if ((XdrvMailbox.index > 0) && (XdrvMailbox.index <= 5)) {
     if (XdrvMailbox.data_len > 0) {
-      if (strstr(XdrvMailbox.data, ",") != nullptr) {  // Process parameter entry
+      if (strchr(XdrvMailbox.data, ',') != nullptr) {  // Process parameter entry
         char *data;
         uint32_t index = strtoul(strtok_r(XdrvMailbox.data, ",", &data), nullptr, 10);
         if ((index > 0) && (data != nullptr)) {
@@ -593,7 +560,7 @@ void HandleDomoticzConfiguration(void) {
   WSContentSendStyle();
   WSContentSend_P(HTTP_FORM_DOMOTICZ);
   for (uint32_t i = 0; i < MAX_DOMOTICZ_IDX; i++) {
-    if (i < devices_present) {
+    if (i < TasmotaGlobal.devices_present) {
       WSContentSend_P(HTTP_FORM_DOMOTICZ_RELAY,
         i +1, i, Settings.domoticz_relay_idx[i],
         i +1, i, Settings.domoticz_key_idx[i]);
@@ -671,7 +638,7 @@ bool Xdrv07(uint8_t function) {
         WSContentSend_P(HTTP_BTN_MENU_DOMOTICZ);
         break;
       case FUNC_WEB_ADD_HANDLER:
-        Webserver->on("/" WEB_HANDLE_DOMOTICZ, HandleDomoticzConfiguration);
+        WebServer_on(PSTR("/" WEB_HANDLE_DOMOTICZ), HandleDomoticzConfiguration);
         break;
 #endif  // USE_WEBSERVER
       case FUNC_MQTT_SUBSCRIBE:

@@ -36,8 +36,6 @@
  * Users are advised to use the user_config_override.h file for most changes.
 \*********************************************************************************************/
 
-//#define USE_CONFIG_OVERRIDE                      // Uncomment to use user_config_override.h file. See README.md
-
 /*********************************************************************************************\
  * SECTION 1
  * - After initial load any change here only take effect if CFG_HOLDER is changed too
@@ -47,7 +45,6 @@
 #define CFG_HOLDER             4617              // [Reset 1] Change this value (max 32000) to load SECTION1 configuration parameters to flash
                                                  // If following define is disabled it increases configuration corruption detection BUT
                                                  //  it only allows firmware upgrades starting from version 6.6.0.11
-//#define CFG_LEGACY_LOAD                          // Support for firmware upgrades from version 6.0.0
 
 // -- Project -------------------------------------
 #define PROJECT                "tasmota"         // PROJECT is used as the default topic delimiter
@@ -93,15 +90,15 @@
 #define MQTT_LOG_LEVEL         LOG_LEVEL_NONE    // [MqttLog] (LOG_LEVEL_NONE, LOG_LEVEL_ERROR, LOG_LEVEL_INFO, LOG_LEVEL_DEBUG, LOG_LEVEL_DEBUG_MORE)
 
 // -- Ota -----------------------------------------
-#define OTA_URL                "http://ota.tasmota.com/tasmota/release/tasmota.bin"  // [OtaUrl]
+#define OTA_URL                "http://ota.tasmota.com/tasmota/release/tasmota.bin.gz"  // [OtaUrl]
 #define OTA_COMPATIBILITY      false             // [SetOption78] Disable OTA compatibility check
 
 // -- MQTT ----------------------------------------
 #define MQTT_USE               true              // [SetOption3] Select default MQTT use (false = Off, true = On)
 
 #define MQTT_HOST              ""                // [MqttHost]
-#define MQTT_FINGERPRINT1      "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"  // [MqttFingerprint1] (auto-learn)
-#define MQTT_FINGERPRINT2      "DA 39 A3 EE 5E 6B 4B 0D 32 55 BF EF 95 60 18 90 AF D8 07 09"  // [MqttFingerprint2] (invalid)
+#define MQTT_FINGERPRINT1      0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00  // [MqttFingerprint1] (auto-learn)
+#define MQTT_FINGERPRINT2      0xDA,0x39,0xA3,0xEE,0x5E,0x6B,0x4B,0x0D,0x32,0x55,0xBF,0xEF,0x95,0x60,0x18,0x90,0xAF,0xD8,0x07,0x09  // [MqttFingerprint2] (invalid)
 #define MQTT_PORT              1883              // [MqttPort] MQTT port (10123 on CloudMQTT)
 #define MQTT_USER              "DVES_USER"       // [MqttUser] MQTT user
 #define MQTT_PASS              "DVES_PASS"       // [MqttPassword] MQTT password
@@ -263,7 +260,7 @@
 
 #define APP_NORMAL_SLEEP       false             // [SetOption60] Enable normal sleep instead of dynamic sleep
 #define APP_SLEEP              0                 // [Sleep] Sleep time to lower energy consumption (0 = Off, 1 - 250 mSec),
-#define PWM_MAX_SLEEP          10                // Sleep will be lowered to this value when light is on, to avoid flickering
+#define PWM_MAX_SLEEP          10                // Sleep will be lowered to this value when light is on, to avoid flickering, and when buzzer is on for better on/off period accuracy
 
 #define KEY_DEBOUNCE_TIME      50                // [ButtonDebounce] Number of mSeconds button press debounce time
 #define KEY_HOLD_TIME          40                // [SetOption32] Number of 0.1 seconds to hold Button or external Pushbutton before sending HOLD message
@@ -359,6 +356,7 @@
 //#define MY_LANGUAGE            sv_SE           // Swedish in Sweden
 //#define MY_LANGUAGE            tr_TR           // Turkish in Turkey
 //#define MY_LANGUAGE            uk_UA           // Ukrainian in Ukraine
+//#define MY_LANGUAGE            vi_VN           // Vietnamese in Vietnam
 //#define MY_LANGUAGE            zh_CN           // Chinese (Simplified) in China
 //#define MY_LANGUAGE            zh_TW           // Chinese (Traditional) in Taiwan
 
@@ -369,8 +367,11 @@
 //#define USE_ARDUINO_OTA                          // Add optional support for Arduino OTA (+13k code)
 
 // -- MQTT ----------------------------------------
-#define MQTT_TELE_RETAIN     0                   // Tele messages may send retain flag (0 = off, 1 = on)
-#define MQTT_CLEAN_SESSION   1                   // Mqtt clean session connection (0 = No clean session, 1 = Clean session (default))
+#define MQTT_LWT_OFFLINE       "Offline"         // MQTT LWT offline topic message
+#define MQTT_LWT_ONLINE        "Online"          // MQTT LWT online topic message
+
+#define MQTT_TELE_RETAIN       0                 // Tele messages may send retain flag (0 = off, 1 = on)
+#define MQTT_CLEAN_SESSION     1                 // Mqtt clean session connection (0 = No clean session, 1 = Clean session (default))
 
 // -- MQTT - Domoticz -----------------------------
 #define USE_DOMOTICZ                             // Enable Domoticz (+6k code, +0.3k mem)
@@ -389,7 +390,8 @@
 //  #define USE_MQTT_TLS_CA_CERT                   // Force full CA validation instead of fingerprints, slower, but simpler to use.  (+2.2k code, +1.9k mem during connection handshake)
                                                    // This includes the LetsEncrypt CA in tasmota_ca.ino for verifying server certificates
 //  #define USE_MQTT_TLS_FORCE_EC_CIPHER           // Force Elliptic Curve cipher (higher security) required by some servers (automatically enabled with USE_MQTT_AWS_IOT) (+11.4k code, +0.4k mem)
-//  #define USE_MQTT_AWS_IOT                       // Enable MQTT for AWS IoT - requires a private key (+11.9k code, +0.4k mem)
+//  #define USE_MQTT_AWS_IOT_LIGHT                 // Enable MQTT for AWS IoT in light mode, with user/password instead of private certificate
+//  #define USE_MQTT_AWS_IOT                       // [Deprecated] Enable MQTT for AWS IoT - requires a private key (+11.9k code, +0.4k mem)
                                                  //   Note: you need to generate a private key + certificate per device and update 'tasmota/tasmota_aws_iot.cpp'
                                                  //   Full documentation here: https://github.com/arendst/Tasmota/wiki/AWS-IoT
 //  #define USE_4K_RSA                             // Support 4096 bits certificates, instead of 2048
@@ -463,14 +465,15 @@
   #define DEVICE_GROUPS_ADDRESS 239,255,250,250  // Device groups multicast address
   #define DEVICE_GROUPS_PORT 4447                // Device groups multicast port
   #define USE_DEVICE_GROUPS_SEND                 // Add support for the DevGroupSend command (+0k6 code)
-#define USE_PWM_DIMMER                           // Add support for MJ-SD01/acenx/NTONPOWER PWM dimmers (+2k2 code, DGR=0k4)
-  #define USE_PWM_DIMMER_REMOTE                  // Add support for remote switches to PWM Dimmer (requires USE_DEVICE_GROUPS) (+0k9 code)
+#define USE_PWM_DIMMER                           // Add support for MJ-SD01/acenx/NTONPOWER PWM dimmers (+2k3 code, DGR=0k7)
+  #define USE_PWM_DIMMER_REMOTE                  // Add support for remote switches to PWM Dimmer (requires USE_DEVICE_GROUPS) (+0k6 code)
 //#define USE_KEELOQ                               // Add support for Jarolift rollers by Keeloq algorithm (+4k5 code)
 #define USE_SONOFF_D1                            // Add support for Sonoff D1 Dimmer (+0k7 code)
 
 // -- Optional light modules ----------------------
 #define USE_WS2812                               // WS2812 Led string using library NeoPixelBus (+5k code, +1k mem, 232 iram) - Disable by //
 //  #define USE_WS2812_DMA                         // DMA supports only GPIO03 (= Serial RXD) (+1k mem). When USE_WS2812_DMA is enabled expect Exceptions on Pow
+//  #define USE_WS2812_INVERTED                    // Use inverted data signal
   #define USE_WS2812_HARDWARE  NEO_HW_WS2812     // Hardware type (NEO_HW_WS2812, NEO_HW_WS2812X, NEO_HW_WS2813, NEO_HW_SK6812, NEO_HW_LC8812, NEO_HW_APA106)
   #define USE_WS2812_CTYPE     NEO_GRB           // Color type (NEO_RGB, NEO_GRB, NEO_BRG, NEO_RBG, NEO_RGBW, NEO_GRBW)
 #define USE_MY92X1                               // Add support for MY92X1 RGBCW led controller as used in Sonoff B1, Ailight and Lohas
@@ -538,6 +541,7 @@
 //  #define USE_SPS30                              // [I2cDriver30] Enable Sensiron SPS30 particle sensor (I2C address 0x69) (+1.7 code)
   #define USE_ADE7953                            // [I2cDriver7] Enable ADE7953 Energy monitor as used on Shelly 2.5 (I2C address 0x38) (+1k5)
 //  #define USE_VL53L0X                            // [I2cDriver31] Enable VL53L0x time of flight sensor (I2C address 0x29) (+4k code)
+//  #define USE_VL53L1X                            // [I2cDriver54] Enable support for VL53L1X sensor (I2C address 0x29) using Pololu VL53L1X library (+2k9 code)
 //  #define USE_MLX90614                           // [I2cDriver32] Enable MLX90614 ir temp sensor (I2C address 0x5a) (+0.6k code)
 //  #define USE_CHIRP                              // [I2cDriver33] Enable CHIRP soil moisture sensor (variable I2C address, default 0x20)
 //  #define USE_PAJ7620                            // [I2cDriver34] Enable PAJ7620 gesture sensor (I2C address 0x73) (+2.5k code)
@@ -557,6 +561,18 @@
 //  #define USE_VEML7700                           // [I2cDriver50] Enable VEML7700 Ambient Light sensor (I2C addresses 0x10) (+4k5 code)
 //  #define USE_MCP9808                            // [I2cDriver51] Enable MCP9808 temperature sensor (I2C addresses 0x18 - 0x1F) (+0k9 code)
 //  #define USE_HP303B                             // [I2cDriver52] Enable HP303B temperature and pressure sensor (I2C address 0x76 or 0x77) (+6k2 code)
+//  #define USE_MLX90640                           // [I2cDriver53] Enable MLX90640 IR array temperature sensor (I2C address 0x33) (+20k code)
+//  #define USE_EZOPH                              // [I2cDriver55] Enable support for EZO's pH sensor (+0k3 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZOORP                             // [I2cDriver55] Enable support for EZO's ORP sensor (+0k3 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZORTD                             // [I2cDriver55] Enable support for EZO's RTD sensor (+0k2 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZOHUM                             // [I2cDriver55] Enable support for EZO's HUM sensor (+0k3 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZOEC                              // [I2cDriver55] Enable support for EZO's EC sensor (+0k3 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZOCO2                             // [I2cDriver55] Enable support for EZO's CO2 sensor (+0k2 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZOO2                              // [I2cDriver55] Enable support for EZO's O2 sensor (+0k3 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZOPRS                             // [I2cDriver55] Enable support for EZO's PRS sensor (+0k7 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZOFLO                             // [I2cDriver55] Enable support for EZO's FLO sensor (+0k4 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZODO                              // [I2cDriver55] Enable support for EZO's DO sensor (+0k3 code) - Shared EZO code required for any EZO device (+1k2 code)
+//  #define USE_EZORGB                             // [I2cDriver55] Enable support for EZO's RGB sensor (+0k5 code) - Shared EZO code required for any EZO device (+1k2 code)
 
 //  #define USE_DISPLAY                            // Add I2C Display Support (+2k code)
     #define USE_DISPLAY_MODES1TO5                // Enable display mode 1 to 5 in addition to mode 0
@@ -633,6 +649,7 @@
   #define USE_TASMOTA_CLIENT_FLASH_SPEED 57600   // Usually 57600 for 3.3V variants and 115200 for 5V variants
   #define USE_TASMOTA_CLIENT_SERIAL_SPEED 57600  // Depends on the sketch that is running on the Uno/Pro Mini
 //#define USE_OPENTHERM                            // Add support for OpenTherm (+15k code)
+//#define USE_MIEL_HVAC                            // Add support for Mitsubishi Electric HVAC serial interface (+5k code)
 
 // -- Power monitoring sensors --------------------
 #define USE_ENERGY_MARGIN_DETECTION              // Add support for Energy Margin detection (+1k6 code)
@@ -645,6 +662,7 @@
   #define SDM120_SPEED         2400              // SDM120-Modbus RS485 serial speed (default: 2400 baud)
 //#define USE_SDM630                               // Add support for Eastron SDM630-Modbus energy monitor (+0k6 code)
   #define SDM630_SPEED         9600              // SDM630-Modbus RS485 serial speed (default: 9600 baud)
+//  #define SDM630_IMPORT                          // Show import active energy in MQTT and Web (+0k3 code)
 //#define USE_DDS2382                              // Add support for Hiking DDS2382 Modbus energy monitor (+0k6 code)
   #define DDS2382_SPEED        9600              // Hiking DDS2382 Modbus RS485 serial speed (default: 9600 baud)
 //#define USE_DDSU666                              // Add support for Chint DDSU666 Modbus energy monitor (+0k6 code)
@@ -661,6 +679,7 @@
 //#define USE_IEM3000                              // Add support for Schneider Electric iEM3000-Modbus series energy monitor (+0k8 code)
   #define IEM3000_SPEED          19200           // iEM3000-Modbus RS485 serial speed (default: 19200 baud)
   #define IEM3000_ADDR           1               // iEM3000-Modbus modbus address (default: 0x01)
+//#define USE_WE517                                // Add support for Orno WE517-Modbus energy monitor (+1k code)
 
 // -- Low level interface devices -----------------
 #define USE_DHT                                  // Add support for DHT11, AM2301 (DHT21, DHT22, AM2302, AM2321) and SI7021 Temperature and Humidity sensor (1k6 code)
@@ -705,6 +724,7 @@
   #define USE_ZIGBEE_COALESCE_ATTR_TIMER 350     // timer to coalesce attribute values (in ms)
   #define USE_ZIGBEE_MODELID      "Tasmota Z2T"  // reported "ModelId"      (cluster 0000 / attribute 0005)
   #define USE_ZIGBEE_MANUFACTURER "Tasmota"      // reported "Manufacturer" (cluster 0000 / attribute 0004)
+  #define USE_ZBBRIDGE_TLS                       // TLS support for zbbridge 
 
 // -- Other sensors/drivers -----------------------
 
@@ -820,7 +840,7 @@
   #include "user_config_override.h"         // Configuration overrides for my_user_config.h
 #endif
 
-#if defined(USE_DISCOVERY) && defined(USE_MQTT_AWS_IOT)
+#if defined(USE_DISCOVERY) && (defined(USE_MQTT_AWS_IOT) || defined(USE_MQTT_AWS_IOT_LIGHT))
   #error "Select either USE_DISCOVERY or USE_MQTT_AWS_IOT, mDNS takes too much code space and is not needed for AWS IoT"
 #endif
 
