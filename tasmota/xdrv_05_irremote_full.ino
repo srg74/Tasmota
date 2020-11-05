@@ -76,7 +76,7 @@ void (* const IrRemoteCommand[])(void) PROGMEM = {
 
 /*********************************************************************************************\
  * Class used to make a compact IR Raw format.
- * 
+ *
  * We round timings to the closest 10ms value,
  * and store up to last 26 values with seen.
  * A value already seen is encoded with a letter indicating the position in the table.
@@ -118,6 +118,16 @@ protected:
 
 IRsend *irsend = nullptr;
 bool irsend_active = false;
+// some ACs send toggle messages rather than state. we need to help IRremoteESP8266 keep track of the state
+// have a flag that is a variable, can be later used to convert this functionality to an option (as in SetOptionXX)
+bool irhvac_stateful = true;
+stdAc::state_t irac_prev_state; // this implementations only keeps one state so if you use a single tasmota-ir device to command more than one AC it might not work
+
+// different modes on how to handle state when sending HVAC commands. needed for ACs with a differential/toggle protocol.
+enum class StateModes { SEND_ONLY, // just send the IR signal, this is the default. expect the state to update when the IR receiver gets the command that IR transmitter sent.
+  STORE_ONLY, // just update the state to what is provided, this is when one needs to sync actual and stored states.
+  SEND_STORE }; // send IR signal but also update stored state. this is for use cases when there is just one transmitter and there is no receiver in the device.
+StateModes strToStateMode(class JsonParserToken token, StateModes def); // declate to prevent errors related to ino files
 
 void IrSendInit(void)
 {
@@ -262,11 +272,12 @@ String sendIRJsonState(const struct decode_results &results) {
   json += ",\"" D_JSON_IR_REPEAT "\":";
   json += results.repeat;
 
-  stdAc::state_t ac_result;
-  if (IRAcUtils::decodeToState(&results, &ac_result, nullptr)) {
+  stdAc::state_t new_state;
+  if (IRAcUtils::decodeToState(&results, &new_state, irhvac_stateful && irac_prev_state.protocol == results.decode_type ? &irac_prev_state : nullptr)) {
     // we have a decoded state
     json += ",\"" D_CMND_IRHVAC "\":";
-    json += sendACJsonState(ac_result);
+    json += sendACJsonState(new_state);
+    irac_prev_state = new_state; // store for next time
   }
 
   return json;
@@ -292,7 +303,7 @@ void IrReceiveCheck(void)
         ResponseAppend_P(PSTR(",\"" D_JSON_IR_RAWDATA "\":\""));
         size_t rawlen = results.rawlen;
         uint32_t i;
-        
+
         for (i = 1; i < rawlen; i++) {
           // round to closest 10ms
           uint32_t raw_val_millis = results.rawbuf[i] * kRawTick;
@@ -309,7 +320,7 @@ void IrReceiveCheck(void)
             prev_number = true;
           }
           ir_high = !ir_high;
-          if (strlen(mqtt_data) > sizeof(mqtt_data) - 40) { break; }  // Quit if char string becomes too long
+          if (strlen(TasmotaGlobal.mqtt_data) > sizeof(TasmotaGlobal.mqtt_data) - 40) { break; }  // Quit if char string becomes too long
         }
         uint16_t extended_length = getCorrectedRawLength(&results);
         ResponseAppend_P(PSTR("\",\"" D_JSON_IR_RAWDATA "Info\":[%d,%d,%d]"), extended_length, i -1, results.overflow);
@@ -361,6 +372,19 @@ bool strToBool(class JsonParserToken token, bool def) {
   }
 }
 
+StateModes strToStateMode(class JsonParserToken token, StateModes def) {
+  if (token.isStr()) {
+    const char * str = token.getStr();
+    if (!strcasecmp_P(str, PSTR(D_JSON_IRHVAC_STATE_MODE_SEND_ONLY)))
+      return StateModes::SEND_ONLY;
+    else if (!strcasecmp_P(str, PSTR(D_JSON_IRHVAC_STATE_MODE_STORE_ONLY)))
+      return StateModes::STORE_ONLY;
+    else if (!strcasecmp_P(str, PSTR(D_JSON_IRHVAC_STATE_MODE_SEND_STORE)))
+      return StateModes::SEND_STORE;
+  }
+  return def;
+}
+
 // used to convert values 0-5 to fanspeed_t
 const stdAc::fanspeed_t IrHvacFanSpeed[] PROGMEM =  { stdAc::fanspeed_t::kAuto,
                       stdAc::fanspeed_t::kMin, stdAc::fanspeed_t::kLow,stdAc::fanspeed_t::kMedium,
@@ -368,7 +392,7 @@ const stdAc::fanspeed_t IrHvacFanSpeed[] PROGMEM =  { stdAc::fanspeed_t::kAuto,
 
 uint32_t IrRemoteCmndIrHvacJson(void)
 {
-  stdAc::state_t state, prev;
+  stdAc::state_t state;
 
   //AddLog_P2(LOG_LEVEL_DEBUG, PSTR("IRHVAC: Received %s"), XdrvMailbox.data);
   JsonParser parser(XdrvMailbox.data);
@@ -420,6 +444,10 @@ uint32_t IrRemoteCmndIrHvacJson(void)
   // AddLog_P2(LOG_LEVEL_DEBUG, PSTR("model %d, mode %d, fanspeed %d, swingv %d, swingh %d"),
   //             state.model, state.mode, state.fanspeed, state.swingv, state.swingh);
 
+  // if and how we should handle the state for IRremote
+  StateModes stateMode = StateModes::SEND_ONLY; // default
+  if (irhvac_stateful && (val = root[PSTR(D_JSON_IRHVAC_STATE_MODE)])) { stateMode = strToStateMode(val, stateMode); }
+
   // decode booleans
   state.power   = strToBool(root[PSTR(D_JSON_IRHVAC_POWER)], state.power);
   state.celsius = strToBool(root[PSTR(D_JSON_IRHVAC_CELSIUS)], state.celsius);
@@ -435,9 +463,14 @@ uint32_t IrRemoteCmndIrHvacJson(void)
   state.sleep = root.getInt(PSTR(D_JSON_IRHVAC_SLEEP), state.sleep);
   //if (json[D_JSON_IRHVAC_CLOCK]) { state.clock = json[D_JSON_IRHVAC_CLOCK]; }   // not sure it's useful to support 'clock'
 
-  IRac ac(Pin(GPIO_IRSEND));
-  bool success = ac.sendAc(state, &prev);
-  if (!success) { return IE_SYNTAX_IRHVAC; }
+  if (stateMode == StateModes::SEND_ONLY || stateMode == StateModes::SEND_STORE) {
+    IRac ac(Pin(GPIO_IRSEND));
+    bool success = ac.sendAc(state, irhvac_stateful && irac_prev_state.protocol == state.protocol ? &irac_prev_state : nullptr);
+    if (!success) { return IE_SYNTAX_IRHVAC; }
+  }
+  if (stateMode == StateModes::STORE_ONLY || stateMode == StateModes::SEND_STORE) { // store state in memory
+    irac_prev_state = state;
+  }
 
   Response_P(PSTR("{\"" D_CMND_IRHVAC "\":%s}"), sendACJsonState(state).c_str());
   return IE_RESPONSE_PROVIDED;
@@ -613,7 +646,7 @@ uint32_t IrRemoteSendRawFormatted(char ** pp, uint32_t count, uint32_t repeat) {
   return IE_NO_ERROR;
 }
 
-// 
+//
 // Parse data as compact or standard form
 //
 // In:
@@ -655,8 +688,7 @@ uint32_t IrRemoteParseRawCompact(char * str, uint16_t * arr, size_t arr_len) {
 //   count: number of commas in parameters, i.e. it contains count+1 values
 //   repeat: number of repeats (0 means no repeat)
 //
-uint32_t IrRemoteSendRawStandard(char ** pp, uint32_t count, uint32_t repeat) {
-  uint16_t freq = parsqeFreq(*pp);
+uint32_t IrRemoteSendRawStandard(char ** pp, uint16_t freq, uint32_t count, uint32_t repeat) {
   // IRsend 0,896,876,900,888,894,876,1790,874,872,1810,1736,948,872,880,872,936,872,1792,900,888,1734
   // IRsend 0,+8570-4240+550-1580C-510+565-1565F-505Fh+570gFhIdChIgFeFgFgIhFgIhF-525C-1560IhIkI-520ChFhFhFgFhIkIhIgIgIkIkI-25270A-4225IkIhIgIhIhIkFhIkFjCgIhIkIkI-500IkIhIhIkFhIgIl+545hIhIoIgIhIkFhFgIkIgFgI
 
@@ -686,36 +718,6 @@ uint32_t IrRemoteSendRawStandard(char ** pp, uint32_t count, uint32_t repeat) {
     free(arr);
   }
   return IE_NO_ERROR;
-
-
-
-  count++;
-  if (count < 200) {
-    uint16_t raw_array[count];  // It's safe to use stack for up to 200 packets (limited by mqtt_data length)
-    for (uint32_t i = 0; i < count; i++) {
-      raw_array[i] = strtol(strtok_r(nullptr, ", ", pp), nullptr, 0);  // Allow decimal (20496) and hexadecimal (0x5010) input
-    }
-
-    irsend_active = true;
-    for (uint32_t r = 0; r <= repeat; r++) {
-      irsend->sendRaw(raw_array, count, freq);
-    }
-  } else {
-    uint16_t *raw_array = reinterpret_cast<uint16_t*>(malloc(count * sizeof(uint16_t)));
-    if (raw_array == nullptr) {
-      return IE_INVALID_RAWDATA;
-    }
-
-    for (uint32_t i = 0; i < count; i++) {
-      raw_array[i] = strtol(strtok_r(nullptr, ", ", pp), nullptr, 0);  // Allow decimal (20496) and hexadecimal (0x5010) input
-    }
-
-    irsend_active = true;
-    for (uint32_t r = 0; r <= repeat; r++) {
-      irsend->sendRaw(raw_array, count, freq);
-    }
-    free(raw_array);
-  }
 }
 
 // parse the frequency value
@@ -763,7 +765,7 @@ uint32_t IrRemoteCmndIrSendRaw(void)
     // standard raw
     // IRsend <freq>,<rawdata>,<rawdata> ...
     // IRsend <freq>,<compact_rawdata>
-    return IrRemoteSendRawStandard(&p, count, repeat);
+    return IrRemoteSendRawStandard(&p, parsqeFreq(str), count, repeat);
   }
 }
 
@@ -772,7 +774,7 @@ void CmndIrSend(void)
   uint8_t error = IE_SYNTAX_IRSEND;
 
   if (XdrvMailbox.data_len) {
-    if (strstr(XdrvMailbox.data, "{") == nullptr) {
+    if (strchr(XdrvMailbox.data, '{') == nullptr) {
       error = IrRemoteCmndIrSendRaw();
     } else {
       error = IrRemoteCmndIrSendJson();
