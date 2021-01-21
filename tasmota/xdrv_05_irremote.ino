@@ -1,7 +1,7 @@
 /*
   xdrv_05_irremote.ino - infra red support for Tasmota
 
-  Copyright (C) 2020  Heiko Krupp, Lazar Obradovic and Theo Arends
+  Copyright (C) 2021  Heiko Krupp, Lazar Obradovic and Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -62,6 +62,12 @@ def ir_expand(ir_compact):
 #include <IRremoteESP8266.h>
 #include <IRutils.h>
 
+// Receiving IR while sending at the same time (i.e. receiving your own signal) was dsiabled in #10041
+// At the demand of @pilaGit, you can `#define IR_RCV_WHILE_SENDING 1` to bring back this behavior
+#ifndef IR_RCV_WHILE_SENDING
+#define IR_RCV_WHILE_SENDING  0
+#endif
+
 enum IrErrors { IE_NO_ERROR, IE_INVALID_RAWDATA, IE_INVALID_JSON, IE_SYNTAX_IRSEND, IE_PROTO_UNSUPPORTED };
 
 const char kIrRemoteCommands[] PROGMEM = "|" D_CMND_IRSEND ;
@@ -119,11 +125,10 @@ const char kIrRemoteProtocols[] PROGMEM = "UNKNOWN|RC5|RC6|NEC";
 #include <IRsend.h>
 
 IRsend *irsend = nullptr;
-bool irsend_active = false;
 
 void IrSendInit(void)
 {
-  irsend = new IRsend(Pin(GPIO_IRSEND)); // an IR led is at GPIO_IRSEND
+  irsend = new IRsend(Pin(GPIO_IRSEND), IR_SEND_INVERTED, IR_SEND_USE_MODULATION); // an IR led is at GPIO_IRSEND
   irsend->begin();
 }
 
@@ -185,12 +190,12 @@ void IrReceiveCheck(void)
       Uint64toHex(results.value, hvalue, 32);  // UNKNOWN is always 32 bits hash
     }
 
-    AddLog_P2(LOG_LEVEL_DEBUG, PSTR(D_LOG_IRR "Echo %d, RawLen %d, Overflow %d, Bits %d, Value 0x%s, Decode %d"),
-              irsend_active, results.rawlen, results.overflow, results.bits, hvalue, results.decode_type);
+    AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_IRR "RawLen %d, Overflow %d, Bits %d, Value 0x%s, Decode %d"),
+              results.rawlen, results.overflow, results.bits, hvalue, results.decode_type);
 
     unsigned long now = millis();
 //    if ((now - ir_lasttime > IR_TIME_AVOID_DUPLICATE) && (UNKNOWN != results.decode_type) && (results.bits > 0)) {
-    if (!irsend_active && (now - ir_lasttime > IR_TIME_AVOID_DUPLICATE)) {
+    if (now - ir_lasttime > IR_TIME_AVOID_DUPLICATE) {
       ir_lasttime = now;
 
       char svalue[64];
@@ -288,10 +293,13 @@ uint32_t IrRemoteCmndIrSendJson(void)
 
   char dvalue[64];
   char hvalue[20];
-  AddLog_P2(LOG_LEVEL_DEBUG, PSTR("IRS: protocol_text %s, protocol %s, bits %d, data %s (0x%s), repeat %d, protocol_code %d"),
+  AddLog_P(LOG_LEVEL_DEBUG, PSTR("IRS: protocol_text %s, protocol %s, bits %d, data %s (0x%s), repeat %d, protocol_code %d"),
     protocol_text, protocol, bits, ulltoa(data, dvalue, 10), Uint64toHex(data, hvalue, bits), repeat, protocol_code);
 
-  irsend_active = true;
+#ifdef USE_IR_RECEIVE
+  if (!IR_RCV_WHILE_SENDING && (irrecv != nullptr)) { irrecv->disableIRIn(); }
+#endif  // USE_IR_RECEIVE
+
   switch (protocol_code) {  // Equals IRremoteESP8266.h enum decode_type_t
 #ifdef USE_IR_SEND_RC5
     case RC5:
@@ -306,9 +314,14 @@ uint32_t IrRemoteCmndIrSendJson(void)
       irsend->sendNEC(data, (bits > NEC_BITS) ? NEC_BITS : bits, repeat); break;
 #endif
     default:
-      irsend_active = false;
+#ifdef USE_IR_RECEIVE
+      if (!IR_RCV_WHILE_SENDING && (irrecv != nullptr)) { irrecv->enableIRIn(); }
+#endif  // USE_IR_RECEIVE
       return IE_PROTO_UNSUPPORTED;
   }
+#ifdef USE_IR_RECEIVE
+  if (!IR_RCV_WHILE_SENDING && (irrecv != nullptr)) { irrecv->enableIRIn(); }
+#endif  // USE_IR_RECEIVE
 
   return IE_NO_ERROR;
 }
@@ -373,7 +386,6 @@ bool Xdrv05(uint8_t function)
           IrReceiveCheck();  // check if there's anything on IR side
         }
 #endif  // USE_IR_RECEIVE
-        irsend_active = false;  // re-enable IR reception
         break;
       case FUNC_COMMAND:
         if (PinUsed(GPIO_IRSEND)) {

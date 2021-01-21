@@ -1,7 +1,7 @@
 /*
   support_buffer.ino - Static binary buffer for Zigbee on Tasmota
 
-  Copyright (C) 2020  Theo Arends and Stephan Hadinger
+  Copyright (C) 2021  Theo Arends and Stephan Hadinger
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -174,6 +174,13 @@ public:
     if (offset < len() - 3) {
       return _buf->buf[offset] | (_buf->buf[offset+1] << 8) |
             (_buf->buf[offset+2] << 16) | (_buf->buf[offset+3] << 24);
+    }
+    return 0;
+  }
+  uint32_t get32BigEndian(const size_t offset) const {
+    if (offset < len() - 3) {
+      return _buf->buf[offset+3] | (_buf->buf[offset+2] << 8) |
+            (_buf->buf[offset+1] << 16) | (_buf->buf[offset] << 24);
     }
     return 0;
   }

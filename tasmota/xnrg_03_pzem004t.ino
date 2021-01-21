@@ -1,7 +1,7 @@
 /*
   xnrg_03_pzem004t.ino - PZEM004T energy sensor support for Tasmota
 
-  Copyright (C) 2020  Theo Arends
+  Copyright (C) 2021  Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -208,7 +208,7 @@ void PzemEvery250ms(void)
         Pzem.read_state = 1;
       }
 
-//      AddLog_P2(LOG_LEVEL_DEBUG, PSTR("PZM: Retry %d"), 5 - Pzem.send_retry);
+//      AddLog_P(LOG_LEVEL_DEBUG, PSTR("PZM: Retry %d"), 5 - Pzem.send_retry);
     }
   }
 
@@ -220,7 +220,7 @@ void PzemEvery250ms(void)
         Pzem.phase--;
       }
 
-//      AddLog_P2(LOG_LEVEL_DEBUG, PSTR("PZM: Probing address %d, Max phases %d"), Pzem.phase +1, Energy.phase_count);
+//      AddLog_P(LOG_LEVEL_DEBUG, PSTR("PZM: Probing address %d, Max phases %d"), Pzem.phase +1, Energy.phase_count);
     }
 
     if (Pzem.address) {

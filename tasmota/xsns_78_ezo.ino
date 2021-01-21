@@ -1,7 +1,7 @@
 /*
   xsns_78_ezo.ino - EZO modules base class
 
-  Copyright (C) 2020  Christopher Tremblay
+  Copyright (C) 2021  Christopher Tremblay
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 */
 #ifdef USE_I2C
 
-#if defined(USE_EZOPH) || defined(USE_EZOORP) || defined(USE_EZORTD) || defined(USE_EZOHUM) || defined(USE_EZOEC) || defined(USE_EZOCO2) || defined(USE_EZOO2) || defined(USE_EZOPRS) || defined(USE_EZOFLO) || defined(USE_EZODO) || defined(USE_EZORGB)
+#if defined(USE_EZOPH) || defined(USE_EZOORP) || defined(USE_EZORTD) || defined(USE_EZOHUM) || defined(USE_EZOEC) || defined(USE_EZOCO2) || defined(USE_EZOO2) || defined(USE_EZOPRS) || defined(USE_EZOFLO) || defined(USE_EZODO) || defined(USE_EZORGB) || defined(USE_EZOPMP)
   #define USE_EZO
 #endif
 #if defined(USE_EZO)

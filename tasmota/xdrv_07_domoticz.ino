@@ -1,7 +1,7 @@
 /*
   xdrv_07_domoticz.ino - domoticz support for Tasmota
 
-  Copyright (C) 2020  Theo Arends
+  Copyright (C) 2021  Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -219,7 +219,7 @@ bool DomoticzMqttData(void) {
   uint32_t idx = domoticz.getUInt(PSTR("idx"), 0);
   int16_t nvalue = domoticz.getInt(PSTR("nvalue"), -1);
 
-  AddLog_P2(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_DOMOTICZ "idx %d, nvalue %d"), idx, nvalue);
+  AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_DOMOTICZ "idx %d, nvalue %d"), idx, nvalue);
 
   bool found = false;
   if ((idx > 0) && (nvalue >= 0) && (nvalue <= 15)) {
@@ -315,7 +315,7 @@ bool DomoticzMqttData(void) {
   }
   if (!found) { return true; }  // No command received
 
-  AddLog_P2(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_DOMOTICZ D_RECEIVED_TOPIC " %s, " D_DATA " %s"), XdrvMailbox.topic, XdrvMailbox.data);
+  AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_DOMOTICZ D_RECEIVED_TOPIC " %s, " D_DATA " %s"), XdrvMailbox.topic, XdrvMailbox.data);
 
   domoticz_update_flag = false;
   return false;  // Process new data
@@ -524,8 +524,6 @@ void CmndDomoticzSend(void) {
 
 #define WEB_HANDLE_DOMOTICZ "dm"
 
-const char S_CONFIGURE_DOMOTICZ[] PROGMEM = D_CONFIGURE_DOMOTICZ;
-
 const char HTTP_BTN_MENU_DOMOTICZ[] PROGMEM =
   "<p><form action='" WEB_HANDLE_DOMOTICZ "' method='get'><button>" D_CONFIGURE_DOMOTICZ "</button></form></p>";
 
@@ -546,9 +544,9 @@ const char HTTP_FORM_DOMOTICZ_TIMER[] PROGMEM =
 void HandleDomoticzConfiguration(void) {
   if (!HttpCheckPriviledgedAccess()) { return; }
 
-  AddLog_P(LOG_LEVEL_DEBUG, S_LOG_HTTP, S_CONFIGURE_DOMOTICZ);
+  AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_DOMOTICZ));
 
-  if (Webserver->hasArg("save")) {
+  if (Webserver->hasArg(F("save"))) {
     DomoticzSaveSettings();
     WebRestart(1);
     return;
@@ -556,7 +554,7 @@ void HandleDomoticzConfiguration(void) {
 
   char stemp[40];
 
-  WSContentStart_P(S_CONFIGURE_DOMOTICZ);
+  WSContentStart_P(PSTR(D_CONFIGURE_DOMOTICZ));
   WSContentSendStyle();
   WSContentSend_P(HTTP_FORM_DOMOTICZ);
   for (uint32_t i = 0; i < MAX_DOMOTICZ_IDX; i++) {
@@ -607,10 +605,10 @@ void DomoticzSaveSettings(void) {
     Settings.domoticz_sensor_idx[i] = (!strlen(tmp)) ? 0 : atoi(tmp);
     snprintf_P(ssensor_indices, sizeof(ssensor_indices), PSTR("%s%s%d"), ssensor_indices, (strlen(ssensor_indices)) ? "," : "",  Settings.domoticz_sensor_idx[i]);
   }
-  WebGetArg("ut", tmp, sizeof(tmp));
+  WebGetArg(PSTR("ut"), tmp, sizeof(tmp));
   Settings.domoticz_update_timer = (!strlen(tmp)) ? DOMOTICZ_UPDATE_TIMER : atoi(tmp);
 
-  AddLog_P2(LOG_LEVEL_INFO, PSTR(D_LOG_DOMOTICZ D_CMND_IDX " %d,%d,%d,%d, " D_CMND_KEYIDX " %d,%d,%d,%d, " D_CMND_SWITCHIDX " %d,%d,%d,%d, " D_CMND_SENSORIDX " %s, " D_CMND_UPDATETIMER " %d"),
+  AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_DOMOTICZ D_CMND_IDX " %d,%d,%d,%d, " D_CMND_KEYIDX " %d,%d,%d,%d, " D_CMND_SWITCHIDX " %d,%d,%d,%d, " D_CMND_SENSORIDX " %s, " D_CMND_UPDATETIMER " %d"),
     Settings.domoticz_relay_idx[0], Settings.domoticz_relay_idx[1], Settings.domoticz_relay_idx[2], Settings.domoticz_relay_idx[3],
     Settings.domoticz_key_idx[0], Settings.domoticz_key_idx[1], Settings.domoticz_key_idx[2], Settings.domoticz_key_idx[3],
     Settings.domoticz_switch_idx[0], Settings.domoticz_switch_idx[1], Settings.domoticz_switch_idx[2], Settings.domoticz_switch_idx[3],

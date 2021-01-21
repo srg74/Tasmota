@@ -1,7 +1,7 @@
 /*
   xdrv_23_zigbee_1_headers.ino - zigbee support for Tasmota
 
-  Copyright (C) 2020  Theo Arends and Stephan Hadinger
+  Copyright (C) 2021  Theo Arends and Stephan Hadinger
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -18,6 +18,10 @@
 */
 
 #ifdef USE_ZIGBEE
+
+#ifdef USE_ZIGBEE_EZSP
+#include "Eeprom24C512.h"
+#endif // USE_ZIGBEE_EZSP
 
 // contains some definitions for functions used before their declarations
 
@@ -69,7 +73,14 @@ const uint8_t  ZIGBEE_LABEL_CONFIGURE_EZSP = 53;   // main loop
 const uint8_t  ZIGBEE_LABEL_ABORT = 99;   // goto label 99 in case of fatal error
 const uint8_t  ZIGBEE_LABEL_UNSUPPORTED_VERSION = 98;  // Unsupported ZNP version
 
-struct ZigbeeStatus {
+class ZigbeeStatus {
+public:
+  ZigbeeStatus()
+#ifdef USE_ZIGBEE_EZSP
+    : eeprom(USE_ZIGBEE_ZBBRIDGE_EEPROM)
+#endif // USE_ZIGBEE_EZSP
+  {}
+
   bool active = true;                 // is Zigbee active for this device, i.e. GPIOs configured
   bool state_machine = false;		      // the state machine is running
   bool state_waiting = false;         // the state machine is waiting for external event or timeout
@@ -77,6 +88,12 @@ struct ZigbeeStatus {
   bool ready = false;								  // cc2530 initialization is complet, ready to operate
   bool init_phase = true;             // initialization phase, before accepting zigbee traffic
   bool recv_until = false;            // ignore all messages until the received frame fully matches
+  bool eeprom_present = false;        // is the ZBBridge EEPROM present?
+  bool eeprom_ready = false;          // is the ZBBridge EEPROM formatted and ready?
+  // Zigbee mapping
+  bool mapping_in_progress = false;   // is there a mapping in progress
+  bool mapping_ready = false;         // do we have mapping information ready
+  uint32_t mapping_end_time = 0;
 
   uint8_t on_error_goto = ZIGBEE_LABEL_ABORT;         // on error goto label, 99 default to abort
   uint8_t on_timeout_goto = ZIGBEE_LABEL_ABORT;       // on timeout goto label, 99 default to abort
@@ -89,6 +106,10 @@ struct ZigbeeStatus {
   ZB_RecvMsgFunc recv_unexpected = nullptr;    // function called when unexpected message is received
 
   uint32_t permit_end_time = 0;       // timestamp when permit join ends
+
+#ifdef USE_ZIGBEE_EZSP
+  Eeprom24C512 eeprom;     // takes only 1 bytes of RAM
+#endif // USE_ZIGBEE_EZSP
 };
 struct ZigbeeStatus zigbee;
 SBuffer *zigbee_buffer = nullptr;
@@ -106,6 +127,18 @@ uint32_t parseHex(const char **data, size_t max_len = 8) {
     *data += 1;
   }
   return ret;
+}
+
+// Since v9.2.0.2 Log buffer was reduced from 700 bytes to 120. This version is specific to Zigbee and restores the 700 bytes limit
+void AddLogZ_P(uint32_t loglevel, PGM_P formatP, ...) {
+  char log_data[MAX_LOGSZ];
+
+  va_list arg;
+  va_start(arg, formatP);
+  vsnprintf_P(log_data, sizeof(log_data), formatP, arg);
+  va_end(arg);
+
+  AddLogData(loglevel, log_data);
 }
 
 #endif // USE_ZIGBEE

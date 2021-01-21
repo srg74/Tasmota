@@ -3,14 +3,168 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - Development
 
-## [9.1.0.1]
+## [9.2.0.3]
+### Added
+- Support for time proportioned (``#define USE_TIMEPROP``) and optional PID (``#define USE_PID``) relay control (#10412)
+- Support rotary encoder on Shelly Dimmer (#10407)
+- Command ``SetOption43 1..255`` to control Rotary step (#10407)
+- Support for BS814A-2 8-button touch buttons by Peter Franck (#10447)
+- Support for up to 4 I2C SEESAW_SOIL Capacitance & Temperature sensors by Peter Franck (#10481)
+- ESP8266 Support for 2MB and up linker files with 1MB and up LittleFS
+- ESP32 support for TLS MQTT using BearSSL (same as ESP8266)
+- Support for 24/26/32/34 bit RFID Wiegand interface (D0/D1) by Sigurd Leuther (#3647)
+- Compile time option ``USE_MQTT_TLS_DROP_OLD_FINGERPRINT`` to drop old (less secure) TLS fingerprint
+- Command ``SetOption40 0..250`` to disable button functionality if activated for over 0.1 second re-introduced
+- Support for SM2135 current selection using GPIO ``SM2135 DAT`` index (#10634)
+- Basic support for ESP32 M5stack core2 16MB binary tasmota32-core2.bin (#10635)
+- Support for Sugar Valley NeoPool Controller by Norbert Richter (#10637)
+
+### Breaking Changed
+- ESP32 switch from default SPIFFS to default LittleFS file system loosing current (zigbee) files
+- ESP8266 until now NOT SUPPORTED linker files 2MB and up. Current settings will be overwritten once LittleFS is enabled
+
 ### Changed
-- platformio compiler option `no target align` enabled for stage
+- Force initial default state ``SetOption57 1`` to scan wifi network every 44 minutes for strongest signal (#10395)
+- Command ``Sleep 0`` removes any sleep from wifi modem except when ESP32 BLE is active
+- PubSubClient MQTT_SOCKET_TIMEOUT from 15 to 4 seconds
+
+## [9.2.0.2] 20210105
+### Added
+- Basic support for ESP32 Odroid Go 16MB binary tasmota32-odroidgo.bin (#8630)
+- Command ``CTRange`` to specify the visible CT range the bulb is capable of (#10311)
+- Command ``VirtualCT`` to simulate or fine tune CT bulbs with 3,4,5 channels (#10311)
+- Command ``SetOption118 1`` to move ZbReceived from JSON message and into the subtopic replacing "SENSOR" default (#10353)
+- Command ``SetOption119 1`` to remove the device addr from json payload, can be used with zb_topic_fname where the addr is already known from the topic (#10355)
+- Command ``RuleTimer0`` to access all RuleTimers at once (#10352)
+- SPI display driver SSD1331 Color oled by Jeroen Vermeulen (#10376)
+- IRremoteESP8266 library from v2.7.13 to v2.7.14
+- Rotary No Pullup GPIO selection ``Rotary A/B_n`` (#10407)
+
+### Breaking Changed
+- Replaced MFRC522 13.56MHz rfid card reader GPIO selection from ``SPI CS`` by ``RC522 CS``
+- Replaced NRF24L01 GPIO selection from ``SPI CS`` by ``NRF24 CS`` and ``SPI DC`` by ``NRF24 DC``
+- Replaced ILI9341 GPIO selection from ``SPI CS`` by ``ILI9341 CS`` and ``SPI DC`` by ``ILI9341 DC``
+- Replaced ST7789 GPIO selection from ``SPI CS`` by ``ST7789 CS`` and ``SPI DC`` by ``ST7789 DC``
+- Replaced ILI9488 GPIO selection from ``SPI CS`` by ``ILI9488_CS``
+- Replaced EPaper29 GPIO selection from ``SPI CS`` by ``EPaper29 CS``
+- Replaced EPaper42 GPIO selection from ``SPI CS`` by ``EPaper42 CS``
+- Replaced SSD1351 GPIO selection from ``SPI CS`` by ``SSD1351 CS``
+- Replaced RA8876 GPIO selection from ``SPI CS`` by ``RA8876 CS``
+
+### Changed
+- Maximum chars in AddLog_P logging reduced from 700 to 128 (LOGSZ) to enhance stability
+- Disabled ``USE_LIGHT`` light support for ZBBridge saving 17.6kB (#10374)
+
+## [9.2.0.1] 20201229
+### Added
+- Milliseconds to console output (#10152)
+- Support for P9813 RGB Led MOSFET controller (#10104)
+- Support for GPIO option selection
+- Gpio ``Option_a1`` enabling PWM2 high impedance if powered off as used by Wyze bulbs (#10196)
+- Support for FTC532 8-button touch controller by Peter Franck (#10222)
+- Support character `#` to be replaced by `space`-character in command ``Publish`` topic (#10258)
+- BSSID and Signal Strength Indicator to GUI wifi scan result (#10253)
+- Support for Afrikaans language translations by Christiaan Heerze
+- Support for IR inverted leds using ``#define IR_SEND_INVERTED true`` (#10301)
+- Support for disabling 38kHz IR modulation using ``#define IR_SEND_USE_MODULATION false`` (#10301)
+- Support for SPI display driver for ST7789 TFT by Gerhard Mutz (#9037)
+
+### Changed
+- Logging from heap to stack freeing 700 bytes RAM
+
+### Fixed
+- Redesign syslog and mqttlog using log buffer (#10164)
+- Shutter stop issue (#10170)
+- Scripter script_sub_command (#10181)
+- Scripter JSON variable above 32 chars (#10193)
+- Shelly Dimmer power on state (#10154, #10182)
+- Wemo emulation for single devices (#10165, #10194)
+- ESP32 LoadStoreError when using ``#define USER_TEMPLATE`` (#9506)
+- Compile error when ``#ifdef USE_IR_RECEIVE`` is disabled regression from 9.1.0.2
+- Prometheus memory leak (#10221)
 
 ## [Released]
 
-### 9.1.0 20201105
+## [9.2.0] 20201216
+- Release Julie
 
+## [9.1.0.2] 20201216
+### Added
+- KNX read reply for Power (#9236, #9891)
+- Zigbee persistence of device/sensor data in EEPROM (only ZBBridge)
+- Support for common anode sevenseg displays by adding ``#define USE_DISPLAY_SEVENSEG_COMMON_ANODE`` by Ken Sanislo (#9963)
+- Support for multiple WeMo devices by Magic73 (#9208)
+- Fallback NTP server from x.pool.ntp.org if no ntpservers are configured
+- TyuaMcu update 2/3 by Federico Leoni (#10004)
+- Optional CCloader support for CC25xx Zigbee or CC26xx BLE by Christian Baars (#9970)
+- Command ``RfProtocol`` to control RcSwitch receive protocols by BBBits (#10063)
+- Zigbee better support for Tuya Protocol (#10074)
+- Support for SPI connected MFRC522 13.56MHz rfid card reader (#9916)
+- Letsencrypt R3 in addition to X3 CA (#10086)
+- Zigbee add visual map of network
+- Command ``SetOption117 1`` for light fading to be fixed duration instead of fixed slew rate (#10109)
+- Support ESP32 SPIFFS for internal use
+
+### Breaking Changed
+- KNX DPT9 (16-bit float) to DPT14 (32-bit float) by Adrian Scillato (#9811, #9888)
+
+### Changed
+- Core library from v2.7.4.7 to v2.7.4.9
+- Shelly Dimmer fw upgrade using WebGUI Firmware Upgrade and file from folder `tools/fw_shd_stm32/`
+- MQTT Wifi connection timeout from 5000 to 200 mSec (#9886)
+- Platformio compiler option `-free -fipa-pta` enabled (#9875)
+- IRremoteESP8266 library from v2.7.12 to v2.7.13
+- Shelly Dimmer 1 and 2 stm32 firmware from v51.4 to v51.5
+- Force bigger Thunk Stack if 4K RSA even without EC ciphers (#10075)
+- mDNS has been disabled from all pre-compiled binaries to allow new features
+
+### Fixed
+- KNX ESP32 UDP mulicastpackage (#9811)
+- Command ``gpio`` using non-indexed functions regression from v9.1.0 (#9962)
+- ESP32 TasmotaClient firmware upgrade (#9218)
+- Reset to defaults after 6 hours of DeepSleep (#9993)
+- Backlog timing wraparound (#9995)
+- First LED in addressable string does not fade when using scheme (#10088)
+- Improved Opentherm error handling (#10055)
+- Platformio compiler option `no target align` removed fixing hardware watchdog exceptions
+- Shutter motordelay stop issue (#10033)
+- Shutter fix overflow on runtime over 100 seconds (#9800)
+- ESP32 CC2530 heap corruption (#10121)
+- ESP32 Analog input div10 rule trigger (#10149)
+
+### Removed
+- PN532 define USE_PN532_CAUSE_EVENTS replaced by generic rule trigger `on pn532#uid=`
+
+## [9.1.0.1] - 20201116
+### Added
+- Zigbee support for Mi Door and Contact (#9759)
+- Zigbee alarm persistence (#9785)
+- Support for EZO PMP sensors by Christopher Tremblay (#9760)
+- Commands ``TuyaRGB``, ``TuyaEnum`` and ``TuyaEnumList`` (#9769)
+- Zigbee command ``ZbInfo`` and prepare support for EEPROM
+- Support for AS608 optical and R503 capacitive fingerprint sensor
+- Command ``SetOption115 1`` to enable ESP32 MiBle
+- Zigbee command ``ZbLeave`` to unpair a device
+- Command ``SetOption116 1`` to disable auto-query of zigbee light devices (avoids network storms with large groups)
+- Support for Shelly Dimmer 1 and 2 by James Turton (#9854)
+- IRremoteESP8266 library from v2.7.11 to v2.7.12
+
+### Changed
+- Core library from v2.7.4.5 to v2.7.4.7
+- Platformio compiler option `no target align` enabled (#9749)
+- Consolidate `AddLog_P` into `AddLog_P2` and rename to `AddLog_P`
+- Sonoff L1 color up scaling and color margin detection (#9545)
+
+### Fixed
+- NTP fallback server functionality (#9739)
+- Telegram group chatid not supported (#9831)
+- KNX buttons, switches and sensors detection regression from v9.1.0 (#9811)
+- GUI MqttUser and MqttPassword updates when TLS is compiled in (#9825)
+
+### Removed
+- Version compatibility check
+
+## [9.1.0] 20201105
 - Release Imogen
 
 ## [9.0.0.3] - 20201105

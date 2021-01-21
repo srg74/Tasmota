@@ -1,7 +1,7 @@
 /*
   tasmota_globals.h - Function prototypes and global configurations for Tasmota
 
-  Copyright (C) 2020  Theo Arends
+  Copyright (C) 2021  Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ extern "C" {
 #endif
 
 #include <esp-knx-ip.h> // KNX Header files have to be global else compile fails -> lib/headers
-#ifdef USE_KNX 
+#ifdef USE_KNX
 void KNX_CB_Action(message_t const &msg, void *arg);
 #endif  // USE_KNX
 
@@ -62,6 +62,78 @@ String EthernetMacAddress(void);
 #include "tasmota_configurations.h"            // Preconfigured configurations
 
 /*********************************************************************************************\
+ * ESP8266 specific parameters
+\*********************************************************************************************/
+
+#ifdef ESP8266
+
+#ifndef MODULE
+#define MODULE                      SONOFF_BASIC   // [Module] Select default model
+#endif
+#ifndef FALLBACK_MODULE
+#define FALLBACK_MODULE             SONOFF_BASIC   // [Module2] Select default module on fast reboot where USER_MODULE is user template
+#endif
+
+#ifndef ARDUINO_ESP8266_RELEASE
+#define ARDUINO_CORE_RELEASE        "STAGE"
+#else
+#define ARDUINO_CORE_RELEASE        ARDUINO_ESP8266_RELEASE
+#endif  // ARDUINO_ESP8266_RELEASE
+
+#ifndef USE_ADC_VCC
+#define USE_ADC
+#else
+#undef USE_ADC
+#endif
+
+#endif  // ESP8266
+
+/*********************************************************************************************\
+ * ESP32 specific parameters
+\*********************************************************************************************/
+
+#ifdef ESP32
+
+#ifndef MODULE
+#define MODULE                      WEMOS          // [Module] Select default model
+#endif
+#ifndef FALLBACK_MODULE
+#define FALLBACK_MODULE             WEMOS          // [Module2] Select default module on fast reboot where USER_MODULE is user template
+#endif
+
+#ifndef ARDUINO_ESP32_RELEASE
+#define ARDUINO_CORE_RELEASE        "STAGE"
+#else
+#define ARDUINO_CORE_RELEASE        ARDUINO_ESP32_RELEASE
+#endif  // ARDUINO_ESP32_RELEASE
+
+#define USE_UFILESYS
+
+// Hardware has no ESP32
+#undef USE_TUYA_DIMMER
+#undef USE_PWM_DIMMER
+#undef USE_EXS_DIMMER
+#undef USE_ARMTRONIX_DIMMERS
+#undef USE_SONOFF_RF
+#undef USE_SONOFF_SC
+#undef USE_SONOFF_IFAN
+#undef USE_SONOFF_L1
+#undef USE_SONOFF_D1
+#undef USE_SHELLY_DIMMER
+#undef USE_RF_FLASH
+
+// Not ported (yet)
+
+#undef USE_MY92X1
+#undef USE_TUYA_MCU
+#undef USE_PS_16_DZ
+
+#undef USE_HM10                     // Disable support for HM-10 as a BLE-bridge as an alternative is using the internal ESP32 BLE
+#undef USE_KEELOQ                   // Disable support for Jarolift rollers by Keeloq algorithm as it's library cc1101 is not compatible with ESP32
+
+#endif  // ESP32
+
+/*********************************************************************************************\
  * Mandatory defines satisfying disabled defines
 \*********************************************************************************************/
 
@@ -83,11 +155,36 @@ String EthernetMacAddress(void);
 #define USE_TASMOTA_CLIENT_SERIAL_SPEED USE_TASMOTA_SLAVE_SERIAL_SPEED
 #endif
 
+#ifdef USE_SCRIPT
+#define USE_UNISHOX_COMPRESSION                // Add support for string compression
+#endif
+#ifdef USE_ZIGBEE
+#define USE_UNISHOX_COMPRESSION                // Add support for string compression
+#endif
+#ifdef USE_EMULATION_HUE
+#define USE_UNISHOX_COMPRESSION                // Add support for string compression
+#endif
+
+#ifdef USE_PID
+#define USE_TIMEPROP
+#endif
+
                                                // See https://github.com/esp8266/Arduino/pull/4889
 #undef NO_EXTRA_4K_HEAP                        // Allocate 4k heap for WPS in ESP8166/Arduino core v2.4.2 (was always allocated in previous versions)
 
 #ifndef USE_SONOFF_RF
 #undef USE_RF_FLASH                            // Disable RF firmware flash when Sonoff Rf is disabled
+#endif
+
+#ifndef USE_ZIGBEE
+#undef USE_ZIGBEE_EZSP                         // Disable Zigbee EZSP firmware flash
+#endif
+
+#ifndef USE_LIGHT
+#undef SHELLY_FW_UPGRADE                       // Disable Shelly Dimmer firmware flash when lights are disabled
+#endif
+#ifndef USE_SHELLY_DIMMER
+#undef SHELLY_FW_UPGRADE                       // Disable Shelly Dimmer firmware flash when Shelly Dimmer is disabled
 #endif
 
 #ifndef APP_INTERLOCK_MODE
@@ -122,15 +219,21 @@ String EthernetMacAddress(void);
 #define WS2812_LEDS                 30         // [Pixels] Number of LEDs
 #endif
 
-//#ifdef USE_MQTT_TLS                            // Set to 4000 on 20200922 per #9305
-//  const uint16_t WEB_LOG_SIZE = 2000;          // Max number of characters in weblog
-//#else
-  const uint16_t WEB_LOG_SIZE = 4000;          // Max number of characters in weblog
-//#endif
+const uint16_t LOG_BUFFER_SIZE = 4000;         // Max number of characters in logbuffer used by weblog, syslog and mqttlog
 
 #if defined(ARDUINO_ESP8266_RELEASE_2_3_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_0) || defined(ARDUINO_ESP8266_RELEASE_2_4_1) || defined(ARDUINO_ESP8266_RELEASE_2_4_2) || defined(ARDUINO_ESP8266_RELEASE_2_5_0) || defined(ARDUINO_ESP8266_RELEASE_2_5_1) || defined(ARDUINO_ESP8266_RELEASE_2_5_2)
   #error "Arduino ESP8266 Core versions before 2.7.1 are not supported"
 #endif
+
+#define UFS_FILE_WRITE              "w"
+#define UFS_FILE_READ               "r"
+#define FS_FILE_WRITE               "w"
+#define FS_FILE_READ                "r"
+#define FS_FILE_APPEND              "a"
+
+#define TASM_FILE_SETTINGS          "/.settings"       // Settings binary blob
+#define TASM_FILE_SETTINGS_LKG      "/.settings.lkg"   // Last Known Good Settings binary blob
+#define TASM_FILE_ZIGBEE            "/zb"              // Zigbee settings blob as used by CC2530 on ESP32
 
 #ifndef MQTT_MAX_PACKET_SIZE
 #define MQTT_MAX_PACKET_SIZE        1200       // Bytes
@@ -318,55 +421,6 @@ const char kWebColors[] PROGMEM =
   COLOR_TIMER_TAB_TEXT "|" COLOR_TIMER_TAB_BACKGROUND "|" COLOR_TITLE_TEXT;
 
 /*********************************************************************************************\
- * ESP8266 vs ESP32 related parameters
-\*********************************************************************************************/
-
-#ifdef ESP8266
-
-#ifndef MODULE
-#define MODULE                      SONOFF_BASIC   // [Module] Select default model
-#endif
-#ifndef FALLBACK_MODULE
-#define FALLBACK_MODULE             SONOFF_BASIC   // [Module2] Select default module on fast reboot where USER_MODULE is user template
-#endif
-
-#ifndef ARDUINO_ESP8266_RELEASE
-#define ARDUINO_CORE_RELEASE        "STAGE"
-#else
-#define ARDUINO_CORE_RELEASE        ARDUINO_ESP8266_RELEASE
-#endif  // ARDUINO_ESP8266_RELEASE
-
-#ifndef USE_ADC_VCC
-#define USE_ADC
-#else
-#undef USE_ADC
-#endif
-
-#endif  // ESP8266
-
-#ifdef ESP32
-
-#ifndef MODULE
-#define MODULE                      WEMOS          // [Module] Select default model
-#endif
-#ifndef FALLBACK_MODULE
-#define FALLBACK_MODULE             WEMOS          // [Module2] Select default module on fast reboot where USER_MODULE is user template
-#endif
-
-#ifndef ARDUINO_ESP32_RELEASE
-#define ARDUINO_CORE_RELEASE        "STAGE"
-#else
-#define ARDUINO_CORE_RELEASE        ARDUINO_ESP32_RELEASE
-#endif  // ARDUINO_ESP32_RELEASE
-
-#undef USE_HM10                     // Disable support for HM-10 as a BLE-bridge as an alternative is using the internal ESP32 BLE
-#undef USE_KEELOQ                   // Disable support for Jarolift rollers by Keeloq algorithm as it's library cc1101 is not compatible with ESP32
-//#undef USE_DISPLAY_ILI9488          // Disable as it's library JaretBurkett_ILI9488-gemu-1.0 is not compatible with ESP32
-//#undef USE_DISPLAY_SSD1351          // Disable as it's library Adafruit_SSD1351_gemu-1.0 is not compatible with ESP32
-
-#endif  // ESP32
-
-/*********************************************************************************************\
  * Macros
 \*********************************************************************************************/
 
@@ -387,8 +441,8 @@ const char kWebColors[] PROGMEM =
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
-#define AGPIO(x) (x<<5)
-#define BGPIO(x) (x>>5)
+#define AGPIO(x) ((x)<<5)
+#define BGPIO(x) ((x)>>5)
 
 #ifdef USE_DEVICE_GROUPS
 #define SendDeviceGroupMessage(DEVICE_INDEX, REQUEST_TYPE, ...) _SendDeviceGroupMessage(DEVICE_INDEX, REQUEST_TYPE, __VA_ARGS__, 0)

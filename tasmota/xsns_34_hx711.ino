@@ -1,7 +1,7 @@
 /*
   xsns_34_hx711.ino - HX711 load cell support for Tasmota
 
-  Copyright (C) 2020  Theo Arends
+  Copyright (C) 2021  Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -241,7 +241,7 @@ bool HxCommand(void)
       break;
     case 7:  // WeightSave
       Settings.energy_frequency_calibration = Hx.weight;
-      Response_P(S_JSON_SENSOR_INDEX_SVALUE, XSNS_34, D_JSON_DONE);
+      Response_P(S_JSON_SENSOR_INDEX_SVALUE, XSNS_34, PSTR(D_JSON_DONE));
       break;
     case 8:  // Json on weight change
       if (strchr(XdrvMailbox.data, ',') != nullptr) {
@@ -264,7 +264,7 @@ bool HxCommand(void)
     char item[33];
     dtostrfd((float)Settings.weight_item / 10, 1, item);
     Response_P(PSTR("{\"Sensor34\":{\"" D_JSON_WEIGHT_REF "\":%d,\"" D_JSON_WEIGHT_CAL "\":%d,\"" D_JSON_WEIGHT_MAX "\":%d,\""
-		    D_JSON_WEIGHT_ITEM "\":%s,\"" D_JSON_WEIGHT_CHANGE "\":%s,\"" D_JSON_WEIGHT_DELTA "\":%d}}"),
+		    D_JSON_WEIGHT_ITEM "\":%s,\"" D_JSON_WEIGHT_CHANGE "\":\"%s\",\"" D_JSON_WEIGHT_DELTA "\":%d}}"),
 	       Settings.weight_reference, Settings.weight_calibration, Settings.weight_max * 1000,
 	       item, GetStateText(Settings.SensorBits1.hx711_json_weight_change), Settings.weight_change);
   }
@@ -468,8 +468,6 @@ void HxShow(bool json)
 
 #define WEB_HANDLE_HX711 "s34"
 
-const char S_CONFIGURE_HX711[] PROGMEM = D_CONFIGURE_HX711;
-
 const char HTTP_BTN_MENU_MAIN_HX711[] PROGMEM =
   "<p><form action='" WEB_HANDLE_HX711 "' method='get'><button name='reset'>" D_RESET_HX711 "</button></form></p>";
 
@@ -492,7 +490,7 @@ void HandleHxAction(void)
 {
   if (!HttpCheckPriviledgedAccess()) { return; }
 
-  AddLog_P(LOG_LEVEL_DEBUG, S_LOG_HTTP, S_CONFIGURE_HX711);
+  AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_HX711));
 
   if (Webserver->hasArg("save")) {
     HxSaveSettings();
@@ -523,7 +521,7 @@ void HandleHxAction(void)
     return;
   }
 
-  WSContentStart_P(S_CONFIGURE_HX711);
+  WSContentStart_P(PSTR(D_CONFIGURE_HX711));
   WSContentSendStyle();
   dtostrfd((float)Settings.weight_reference / 1000, 3, stemp1);
   char stemp2[20];
@@ -551,7 +549,7 @@ void HxLogUpdates(void)
   char weigth_item_chr[33];
   dtostrfd((float)Settings.weight_item / 10000, 4, weigth_item_chr);
 
-  AddLog_P2(LOG_LEVEL_INFO, PSTR(D_LOG_WIFI D_JSON_WEIGHT_REF " %s, " D_JSON_WEIGHT_ITEM " %s"), weigth_ref_chr, weigth_item_chr);
+  AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_WIFI D_JSON_WEIGHT_REF " %s, " D_JSON_WEIGHT_ITEM " %s"), weigth_ref_chr, weigth_item_chr);
 }
 
 #endif  // USE_HX711_GUI

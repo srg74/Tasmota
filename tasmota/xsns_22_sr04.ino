@@ -1,7 +1,7 @@
 /*
   xsns_22_sr04.ino - SR04 ultrasonic sensor support for Tasmota
 
-  Copyright (C) 2020  Nuno Ferreira and Theo Arends
+  Copyright (C) 2021  Nuno Ferreira and Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ uint8_t Sr04TModeDetect(void)
     }
   }
 
-  AddLog_P2(LOG_LEVEL_INFO,PSTR("SR04: Mode %d"), sr04_type);
+  AddLog_P(LOG_LEVEL_INFO,PSTR("SR04: Mode %d"), sr04_type);
   return sr04_type;
 }
 
@@ -123,7 +123,7 @@ uint16_t Sr04TMode2Distance(void)
 
   //check crc sum
   if (crc != sonar_serial->read()) {
-    AddLog_P2(LOG_LEVEL_ERROR,PSTR("SR04: Reading CRC error."));
+    AddLog_P(LOG_LEVEL_ERROR,PSTR("SR04: Reading CRC error."));
     return NO_ECHO;
   }
   //DEBUG_SENSOR_LOG(PSTR("SR04: Distance: %d"), distance);

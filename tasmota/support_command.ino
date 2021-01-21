@@ -1,7 +1,7 @@
 /*
   support_command.ino - command support for Tasmota
 
-  Copyright (C) 2020  Theo Arends
+  Copyright (C) 2021  Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ const char kTasmotaCommands[] PROGMEM = "|"  // No prefix
   D_CMND_SERIALDELIMITER "|" D_CMND_IPADDRESS "|" D_CMND_NTPSERVER "|" D_CMND_AP "|" D_CMND_SSID "|" D_CMND_PASSWORD "|" D_CMND_HOSTNAME "|" D_CMND_WIFICONFIG "|"
   D_CMND_DEVICENAME "|" D_CMND_FRIENDLYNAME "|" D_CMND_SWITCHMODE "|" D_CMND_INTERLOCK "|" D_CMND_TELEPERIOD "|" D_CMND_RESET "|" D_CMND_TIME "|" D_CMND_TIMEZONE "|" D_CMND_TIMESTD "|"
   D_CMND_TIMEDST "|" D_CMND_ALTITUDE "|" D_CMND_LEDPOWER "|" D_CMND_LEDSTATE "|" D_CMND_LEDMASK "|" D_CMND_LEDPWM_ON "|" D_CMND_LEDPWM_OFF "|" D_CMND_LEDPWM_MODE "|"
-  D_CMND_WIFIPOWER "|" D_CMND_TEMPOFFSET "|" D_CMND_HUMOFFSET "|" D_CMND_SPEEDUNIT "|" D_CMND_GLOBAL_TEMP "|" D_CMND_GLOBAL_HUM "|" D_CMND_WIFI "|" D_CMND_SWITCHTEXT "|"
+  D_CMND_WIFIPOWER "|" D_CMND_TEMPOFFSET "|" D_CMND_HUMOFFSET "|" D_CMND_SPEEDUNIT "|" D_CMND_GLOBAL_TEMP "|" D_CMND_GLOBAL_HUM"|" D_CMND_SWITCHTEXT "|"
 #ifdef USE_I2C
   D_CMND_I2CSCAN "|" D_CMND_I2CDRIVER "|"
 #endif
@@ -40,8 +40,8 @@ const char kTasmotaCommands[] PROGMEM = "|"  // No prefix
 #endif  // USE_DEVICE_GROUPS
   D_CMND_SENSOR "|" D_CMND_DRIVER
 #ifdef ESP32
-   "|" D_CMND_TOUCH_CAL "|" D_CMND_TOUCH_THRES "|" D_CMND_TOUCH_NUM "|" D_CMND_CPU_FREQUENCY
-#endif //ESP32
+   "|Info|" D_CMND_TOUCH_CAL "|" D_CMND_TOUCH_THRES "|" D_CMND_TOUCH_NUM "|" D_CMND_CPU_FREQUENCY "|" D_CMND_WIFI
+#endif  // ESP32
   ;
 
 void (* const TasmotaCommand[])(void) PROGMEM = {
@@ -54,7 +54,7 @@ void (* const TasmotaCommand[])(void) PROGMEM = {
   &CmndSerialDelimiter, &CmndIpAddress, &CmndNtpServer, &CmndAp, &CmndSsid, &CmndPassword, &CmndHostname, &CmndWifiConfig,
   &CmndDevicename, &CmndFriendlyname, &CmndSwitchMode, &CmndInterlock, &CmndTeleperiod, &CmndReset, &CmndTime, &CmndTimezone, &CmndTimeStd,
   &CmndTimeDst, &CmndAltitude, &CmndLedPower, &CmndLedState, &CmndLedMask, &CmndLedPwmOn, &CmndLedPwmOff, &CmndLedPwmMode,
-  &CmndWifiPower, &CmndTempOffset, &CmndHumOffset, &CmndSpeedUnit, &CmndGlobalTemp, &CmndGlobalHum, &CmndWifi, &CmndSwitchText,
+  &CmndWifiPower, &CmndTempOffset, &CmndHumOffset, &CmndSpeedUnit, &CmndGlobalTemp, &CmndGlobalHum, &CmndSwitchText,
 #ifdef USE_I2C
   &CmndI2cScan, CmndI2cDriver,
 #endif
@@ -67,8 +67,8 @@ void (* const TasmotaCommand[])(void) PROGMEM = {
 #endif  // USE_DEVICE_GROUPS
   &CmndSensor, &CmndDriver
 #ifdef ESP32
-  ,&CmndTouchCal, &CmndTouchThres, &CmndTouchNum, &CmndCpuFrequency
-#endif //ESP32
+  , &CmndInfo, &CmndTouchCal, &CmndTouchThres, &CmndTouchNum, &CmndCpuFrequency, &CmndWifi
+#endif  // ESP32
   };
 
 const char kWifiConfig[] PROGMEM =
@@ -110,7 +110,7 @@ void ResponseCmndStateText(uint32_t value)
 
 void ResponseCmndDone(void)
 {
-  ResponseCmndChar(D_JSON_DONE);
+  ResponseCmndChar(PSTR(D_JSON_DONE));
 }
 
 void ResponseCmndIdxChar(const char* value)
@@ -227,7 +227,7 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
     type[i] = '\0';
   }
 
-  AddLog_P2(LOG_LEVEL_DEBUG, PSTR("CMD: " D_GROUP " %d, " D_INDEX " %d, " D_COMMAND " \"%s\", " D_DATA " \"%s\""), grpflg, index, type, dataBuf);
+  AddLog_P(LOG_LEVEL_DEBUG, PSTR("CMD: " D_GROUP " %d, " D_INDEX " %d, " D_COMMAND " \"%s\", " D_DATA " \"%s\""), grpflg, index, type, dataBuf);
 
   if (type != nullptr) {
     Response_P(PSTR("{\"" D_JSON_COMMAND "\":\"" D_JSON_ERROR "\"}"));
@@ -244,8 +244,8 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
 
     DEBUG_CORE_LOG(PSTR("CMD: Payload %d"), payload);
 
-//    TasmotaGlobal.backlog_delay = millis() + (100 * MIN_BACKLOG_DELAY);
-    TasmotaGlobal.backlog_delay = millis() + Settings.param[P_BACKLOG_DELAY];
+//    TasmotaGlobal.backlog_timer = millis() + (100 * MIN_BACKLOG_DELAY);
+    TasmotaGlobal.backlog_timer = millis() + Settings.param[P_BACKLOG_DELAY];  // SetOption34
 
     char command[CMDSZ] = { 0 };
     XdrvMailbox.command = command;
@@ -268,7 +268,7 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
         }
       }
     }
-#else //USE_SCRIPT_SUB_COMMAND
+#else  // USE_SCRIPT_SUB_COMMAND
     if (!DecodeCommand(kTasmotaCommands, TasmotaCommand)) {
       if (!XdrvCall(FUNC_COMMAND)) {
         if (!XsnsCall(FUNC_COMMAND)) {
@@ -276,7 +276,7 @@ void CommandHandler(char* topicBuf, char* dataBuf, uint32_t data_len)
         }
       }
     }
-#endif //USE_SCRIPT_SUB_COMMAND
+#endif  // USE_SCRIPT_SUB_COMMAND
 
   }
 
@@ -344,7 +344,7 @@ void CmndBacklog(void)
     }
 //    ResponseCmndChar(D_JSON_APPENDED);
     ResponseClear();
-    TasmotaGlobal.backlog_delay = 0;
+    TasmotaGlobal.backlog_timer = millis();
   } else {
     bool blflag = BACKLOG_EMPTY;
 #ifdef SUPPORT_IF_STATEMENT
@@ -352,17 +352,17 @@ void CmndBacklog(void)
 #else
     TasmotaGlobal.backlog_pointer = TasmotaGlobal.backlog_index;
 #endif
-    ResponseCmndChar(blflag ? D_JSON_EMPTY : D_JSON_ABORTED);
+    ResponseCmndChar(blflag ? PSTR(D_JSON_EMPTY) : PSTR(D_JSON_ABORTED));
   }
 }
 
 void CmndDelay(void)
 {
   if ((XdrvMailbox.payload >= (MIN_BACKLOG_DELAY / 100)) && (XdrvMailbox.payload <= 3600)) {
-    TasmotaGlobal.backlog_delay = millis() + (100 * XdrvMailbox.payload);
+    TasmotaGlobal.backlog_timer = millis() + (100 * XdrvMailbox.payload);
   }
   uint32_t bl_delay = 0;
-  long bl_delta = TimePassedSince(TasmotaGlobal.backlog_delay);
+  long bl_delta = TimePassedSince(TasmotaGlobal.backlog_timer);
   if (bl_delta < 0) { bl_delay = (bl_delta *-1) / 100; }
   ResponseCmndNumber(bl_delay);
 }
@@ -483,20 +483,20 @@ void CmndStatus(void)
     Response_P(PSTR("{\"" D_CMND_STATUS D_STATUS4_MEMORY "\":{\"" D_JSON_PROGRAMSIZE "\":%d,\"" D_JSON_FREEMEMORY "\":%d,\"" D_JSON_HEAPSIZE "\":%d,\""
 #ifdef ESP32
                           D_JSON_PSRMAXMEMORY "\":%d,\"" D_JSON_PSRFREEMEMORY "\":%d,\""
-#endif
+#endif  // ESP32
                           D_JSON_PROGRAMFLASHSIZE "\":%d,\"" D_JSON_FLASHSIZE "\":%d"
 #ifdef ESP8266
                           ",\"" D_JSON_FLASHCHIPID "\":\"%06X\""
-#endif
+#endif  // ESP8266
                           ",\"FlashFrequency\":%d,\"" D_JSON_FLASHMODE "\":%d"),
                           ESP_getSketchSize()/1024, ESP.getFreeSketchSpace()/1024, ESP_getFreeHeap()/1024,
 #ifdef ESP32
                           ESP.getPsramSize()/1024, ESP.getFreePsram()/1024,
-#endif
+#endif  // ESP32
                           ESP.getFlashChipSize()/1024, ESP.getFlashChipRealSize()/1024
 #ifdef ESP8266
                           , ESP.getFlashChipId()
-#endif
+#endif  // ESP8266
                           , ESP.getFlashChipSpeed()/1000000, ESP.getFlashChipMode());
     ResponseAppendFeatures();
     XsnsDriverState();
@@ -510,8 +510,8 @@ void CmndStatus(void)
     Response_P(PSTR("{\"" D_CMND_STATUS D_STATUS5_NETWORK "\":{\"" D_CMND_HOSTNAME "\":\"%s\",\"" D_CMND_IPADDRESS "\":\"%s\",\"" D_JSON_GATEWAY "\":\"%s\",\""
                           D_JSON_SUBNETMASK "\":\"%s\",\"" D_JSON_DNSSERVER "\":\"%s\",\"" D_JSON_MAC "\":\"%s\",\""
                           D_CMND_WEBSERVER "\":%d,\"" D_CMND_WIFICONFIG "\":%d,\"" D_CMND_WIFIPOWER "\":%s}}"),
-                          NetworkHostname(), NetworkAddress().toString().c_str(), IPAddress(Settings.ip_address[1]).toString().c_str(),
-                          IPAddress(Settings.ip_address[2]).toString().c_str(), IPAddress(Settings.ip_address[3]).toString().c_str(), NetworkMacAddress().c_str(),
+                          NetworkHostname(), NetworkAddress().toString().c_str(), IPAddress(Settings.ipv4_address[1]).toString().c_str(),
+                          IPAddress(Settings.ipv4_address[2]).toString().c_str(), IPAddress(Settings.ipv4_address[3]).toString().c_str(), NetworkMacAddress().c_str(),
                           Settings.webserver, Settings.sta_config, WifiGetOutputPower().c_str());
     MqttPublishPrefixTopic_P(STAT, PSTR(D_CMND_STATUS "5"));
   }
@@ -727,12 +727,12 @@ void CmndRestart(void)
   switch (XdrvMailbox.payload) {
   case 1:
     TasmotaGlobal.restart_flag = 2;
-    ResponseCmndChar(D_JSON_RESTARTING);
+    ResponseCmndChar(PSTR(D_JSON_RESTARTING));
     break;
   case 2:
     TasmotaGlobal.restart_flag = 2;
     TasmotaGlobal.restart_halt = true;
-    ResponseCmndChar(D_JSON_HALTING);
+    ResponseCmndChar(PSTR(D_JSON_HALTING));
     break;
   case -1:
     CmndCrash();    // force a crash
@@ -884,7 +884,12 @@ void CmndSetoption(void)
 #endif
 #if (defined(USE_IR_REMOTE) && defined(USE_IR_RECEIVE)) || defined(USE_IR_REMOTE_FULL)
           if (P_IR_UNKNOW_THRESHOLD == pindex) {
-            IrReceiveUpdateThreshold();
+            IrReceiveUpdateThreshold();    // SetOption38
+          }
+#endif
+#ifdef ROTARY_V1
+          if (P_ROTARY_MAX_STEP == pindex) {
+            RotaryInitMaxSteps();          // SetOption43
           }
 #endif
         } else {
@@ -941,6 +946,11 @@ void CmndSetoption(void)
           else if (4 == ptype) {           // SetOption82 .. 113
             bitWrite(Settings.flag4.data, pindex, XdrvMailbox.payload);
             switch (pindex) {
+#ifdef USE_LIGHT
+              case 0:                      // SetOption 82 - (Alexa) Reduced CT range for Alexa (1)
+                setAlexaCTRange();
+                break;
+#endif
               case 3:                      // SetOption85 - Enable Device Groups
               case 6:                      // SetOption88 - PWM Dimmer Buttons control remote devices
               case 15:                     // SetOption97 - Set Baud rate for TuyaMCU serial communication (0 = 9600 or 1 = 115200)
@@ -955,6 +965,13 @@ void CmndSetoption(void)
           }
           else if (5 == ptype) {           // SetOption114 .. 145
             bitWrite(Settings.flag5.data, pindex, XdrvMailbox.payload);
+            switch (pindex) {
+              case 1:                      // SetOption115 - Enable ESP32 MI32
+                if (0 == XdrvMailbox.payload) {
+                  TasmotaGlobal.restart_flag = 2;
+                }
+                break;
+            }
           }
         } else {
           ptype = 99;                      // Command Error
@@ -1113,7 +1130,7 @@ void CmndModules(void)
     }
     jsflg = true;
     uint32_t j = i ? midx +1 : 0;
-    if ((ResponseAppend_P(PSTR("\"%d\":\"%s\""), j, AnyModuleName(midx).c_str()) > (LOGSZ - TOPSZ)) || (i == sizeof(kModuleNiceList))) {
+    if ((ResponseAppend_P(PSTR("\"%d\":\"%s\""), j, AnyModuleName(midx).c_str()) > (MAX_LOGSZ - TOPSZ)) || (i == sizeof(kModuleNiceList))) {
       ResponseJsonEndEnd();
       MqttPublishPrefixTopic_P(RESULT_OR_STAT, XdrvMailbox.command);
       jsflg = false;
@@ -1126,20 +1143,21 @@ void CmndModules(void)
 void CmndGpio(void)
 {
   if (XdrvMailbox.index < ARRAY_SIZE(Settings.my_gp.io)) {
-    myio cmodule;
-    ModuleGpios(&cmodule);
-    if (ValidGPIO(XdrvMailbox.index, cmodule.io[XdrvMailbox.index]) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < AGPIO(GPIO_SENSOR_END))) {
+    myio template_gp;
+    TemplateGpios(&template_gp);
+    if (ValidGPIO(XdrvMailbox.index, template_gp.io[XdrvMailbox.index]) && (XdrvMailbox.payload >= 0) && (XdrvMailbox.payload < AGPIO(GPIO_SENSOR_END))) {
       bool present = false;
       for (uint32_t i = 0; i < ARRAY_SIZE(kGpioNiceList); i++) {
         uint32_t midx = pgm_read_word(kGpioNiceList + i);
-        if ((XdrvMailbox.payload >= (midx & 0xFFE0)) && (XdrvMailbox.payload < midx)) {
+        uint32_t max_midx = ((midx & 0x001F) > 0) ? midx : midx +1;
+        if ((XdrvMailbox.payload >= (midx & 0xFFE0)) && (XdrvMailbox.payload < max_midx)) {
           present = true;
           break;
         }
       }
       if (present) {
         for (uint32_t i = 0; i < ARRAY_SIZE(Settings.my_gp.io); i++) {
-          if (ValidGPIO(i, cmodule.io[i]) && (Settings.my_gp.io[i] == XdrvMailbox.payload)) {
+          if (ValidGPIO(i, template_gp.io[i]) && (Settings.my_gp.io[i] == XdrvMailbox.payload)) {
             Settings.my_gp.io[i] = GPIO_NONE;
           }
         }
@@ -1147,15 +1165,19 @@ void CmndGpio(void)
         TasmotaGlobal.restart_flag = 2;
       }
     }
-    Response_P(PSTR("{"));
     bool jsflg = false;
+    bool jsflg2 = false;
     for (uint32_t i = 0; i < ARRAY_SIZE(Settings.my_gp.io); i++) {
-      if (ValidGPIO(i, cmodule.io[i]) || ((255 == XdrvMailbox.payload) && !FlashPin(i))) {
-        if (jsflg) { ResponseAppend_P(PSTR(",")); }
+      if (ValidGPIO(i, template_gp.io[i]) || ((255 == XdrvMailbox.payload) && !FlashPin(i))) {
+        if (!jsflg) {
+          Response_P(PSTR("{"));
+        } else {
+          ResponseAppend_P(PSTR(","));
+        }
         jsflg = true;
         uint32_t sensor_type = Settings.my_gp.io[i];
-        if (!ValidGPIO(i, cmodule.io[i])) {
-          sensor_type = cmodule.io[i];
+        if (!ValidGPIO(i, template_gp.io[i])) {
+          sensor_type = template_gp.io[i];
           if (AGPIO(GPIO_USER) == sensor_type) {  // A user GPIO equals a not connected (=GPIO_NONE) GPIO here
             sensor_type = GPIO_NONE;
           }
@@ -1176,14 +1198,18 @@ void CmndGpio(void)
           sensor_names = kSensorNamesFixed;
         }
         char stemp1[TOPSZ];
-        ResponseAppend_P(PSTR("\"" D_CMND_GPIO "%d\":{\"%d\":\"%s%s\"}"),
-          i, sensor_type, GetTextIndexed(stemp1, sizeof(stemp1), sensor_name_idx, sensor_names), sindex);
+        if ((ResponseAppend_P(PSTR("\"" D_CMND_GPIO "%d\":{\"%d\":\"%s%s\"}"), i, sensor_type, GetTextIndexed(stemp1, sizeof(stemp1), sensor_name_idx, sensor_names), sindex) > (MAX_LOGSZ - TOPSZ)) || (i == ARRAY_SIZE(Settings.my_gp.io) -1)) {
+          ResponseJsonEnd();
+          MqttPublishPrefixTopic_P(RESULT_OR_STAT, XdrvMailbox.command);
+          jsflg2 = true;
+          jsflg = false;
+        }
       }
     }
-    if (jsflg) {
-      ResponseJsonEnd();
+    if (jsflg2) {
+      ResponseClear();
     } else {
-      ResponseCmndChar(D_JSON_NOT_SUPPORTED);
+      ResponseCmndChar(PSTR(D_JSON_NOT_SUPPORTED));
     }
   }
 }
@@ -1191,8 +1217,6 @@ void CmndGpio(void)
 void ShowGpios(const uint16_t *NiceList, uint32_t size, uint32_t offset, uint32_t &lines) {
   uint32_t ridx;
   uint32_t midx;
-  myio cmodule;
-  ModuleGpios(&cmodule);
   bool jsflg = false;
   for (uint32_t i = offset; i < size; i++) {  // Skip ADC_NONE
     if (NiceList == nullptr) {
@@ -1201,7 +1225,6 @@ void ShowGpios(const uint16_t *NiceList, uint32_t size, uint32_t offset, uint32_
     } else {
       ridx = pgm_read_word(NiceList + i) & 0xFFE0;
       midx = BGPIO(ridx);
-      if ((XdrvMailbox.payload != 255) && GetUsedInModule(midx, cmodule.io)) { continue; }
     }
     if (!jsflg) {
       Response_P(PSTR("{\"" D_CMND_GPIOS "%d\":{"), lines);
@@ -1210,7 +1233,7 @@ void ShowGpios(const uint16_t *NiceList, uint32_t size, uint32_t offset, uint32_
     }
     jsflg = true;
     char stemp1[TOPSZ];
-    if ((ResponseAppend_P(PSTR("\"%d\":\"%s\""), ridx, GetTextIndexed(stemp1, sizeof(stemp1), midx, kSensorNames)) > (LOGSZ - TOPSZ)) || (i == size -1)) {
+    if ((ResponseAppend_P(PSTR("\"%d\":\"%s\""), ridx, GetTextIndexed(stemp1, sizeof(stemp1), midx, kSensorNames)) > (MAX_LOGSZ - TOPSZ)) || (i == size -1)) {
       ResponseJsonEndEnd();
       MqttPublishPrefixTopic_P(RESULT_OR_STAT, XdrvMailbox.command);
       jsflg = false;
@@ -1259,7 +1282,7 @@ void CmndTemplate(void)
       if (Settings.module != USER_MODULE) {
         ModuleDefault(Settings.module);
       }
-      SettingsUpdateText(SET_TEMPLATE_NAME, "Merged");
+      SettingsUpdateText(SET_TEMPLATE_NAME, PSTR("Merged"));
       uint32_t j = 0;
       for (uint32_t i = 0; i < ARRAY_SIZE(Settings.user_template.gp.io); i++) {
         if (6 == i) { j = 9; }
@@ -1272,12 +1295,14 @@ void CmndTemplate(void)
     }
   }
   else {
-    if (JsonTemplate(XdrvMailbox.data)) {    // Free 336 bytes StaticJsonBuffer stack space by moving code to function
+#ifndef FIRMWARE_MINIMAL      // if tasmota-minimal, `Template` is read-only
+    if (JsonTemplate(XdrvMailbox.data)) {
       if (USER_MODULE == Settings.module) { TasmotaGlobal.restart_flag = 2; }
     } else {
       ResponseCmndChar_P(PSTR(D_JSON_INVALID_JSON));
       error = true;
     }
+#endif // FIRMWARE_MINIMAL
   }
   if (!error) { TemplateJson(); }
 }
@@ -1467,14 +1492,24 @@ void CmndLogport(void)
 void CmndIpAddress(void)
 {
   if ((XdrvMailbox.index > 0) && (XdrvMailbox.index <= 4)) {
-    uint32_t address;
-    if (ParseIp(&address, XdrvMailbox.data)) {
-      Settings.ip_address[XdrvMailbox.index -1] = address;
+    if (!XdrvMailbox.usridx) {
+      char stemp1[TOPSZ];
+      snprintf_P(stemp1, sizeof(stemp1), PSTR(" %s"), NetworkAddress().toString().c_str());
+      ResponseClear();
+      for (uint32_t i = 0; i < 4; i++) {
+        ResponseAppend_P(PSTR("%c\"%s%d\":\"%s%s\""), (i) ? ',' : '{', XdrvMailbox.command, i +1, IPAddress(Settings.ipv4_address[i]).toString().c_str(), (0 == i) ? stemp1:"");
+      }
+      ResponseJsonEnd();
+    } else {
+      uint32_t ipv4_address;
+      if (ParseIPv4(&ipv4_address, XdrvMailbox.data)) {
+        Settings.ipv4_address[XdrvMailbox.index -1] = ipv4_address;
 //        TasmotaGlobal.restart_flag = 2;
+      }
+      char stemp1[TOPSZ];
+      snprintf_P(stemp1, sizeof(stemp1), PSTR(" %s"), NetworkAddress().toString().c_str());
+      Response_P(S_JSON_COMMAND_INDEX_SVALUE_SVALUE, XdrvMailbox.command, XdrvMailbox.index, IPAddress(Settings.ipv4_address[XdrvMailbox.index -1]).toString().c_str(), (1 == XdrvMailbox.index) ? stemp1:"");
     }
-    char stemp1[TOPSZ];
-    snprintf_P(stemp1, sizeof(stemp1), PSTR(" (%s)"), WiFi.localIP().toString().c_str());
-    Response_P(S_JSON_COMMAND_INDEX_SVALUE_SVALUE, XdrvMailbox.command, XdrvMailbox.index, IPAddress(Settings.ip_address[XdrvMailbox.index -1]).toString().c_str(), (1 == XdrvMailbox.index) ? stemp1:"");
   }
 }
 
@@ -1572,15 +1607,6 @@ void CmndWifiConfig(void)
   }
   char stemp1[TOPSZ];
   Response_P(S_JSON_COMMAND_NVALUE_SVALUE, XdrvMailbox.command, Settings.sta_config, GetTextIndexed(stemp1, sizeof(stemp1), Settings.sta_config, kWifiConfig));
-}
-
-void CmndWifi(void)
-{
-  if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 1)) {
-    Settings.flag4.network_wifi = XdrvMailbox.payload;
-    TasmotaGlobal.restart_flag = 2;
-  }
-  ResponseCmndStateText(Settings.flag4.network_wifi);
 }
 
 void CmndDevicename(void)
@@ -2061,6 +2087,20 @@ void CmndDriver(void)
 
 #ifdef ESP32
 
+void CmndInfo(void) {
+  NvsInfo();
+  ResponseCmndDone();
+}
+
+void CmndWifi(void)
+{
+  if ((XdrvMailbox.payload >= 0) && (XdrvMailbox.payload <= 1)) {
+    Settings.flag4.network_wifi = XdrvMailbox.payload;
+    TasmotaGlobal.restart_flag = 2;
+  }
+  ResponseCmndStateText(Settings.flag4.network_wifi);
+}
+
 void CmndCpuFrequency(void) {
   if ((80 == XdrvMailbox.payload) || (160 == XdrvMailbox.payload) || (240 == XdrvMailbox.payload)) {
     setCpuFrequencyMhz(XdrvMailbox.payload);
@@ -2077,7 +2117,7 @@ void CmndTouchCal(void)
   }
   Response_P(PSTR("{\"" D_CMND_TOUCH_CAL "\": %u"), TOUCH_BUTTON.calibration);
   ResponseJsonEnd();
-  AddLog_P2(LOG_LEVEL_INFO, PSTR("Button Touchvalue Hits,"));
+  AddLog_P(LOG_LEVEL_INFO, PSTR("Button Touchvalue Hits,"));
 }
 
 void CmndTouchThres(void)
@@ -2103,4 +2143,4 @@ void CmndTouchNum(void)
 
 }
 
-#endif //ESP32
+#endif  // ESP32

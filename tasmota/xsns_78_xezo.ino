@@ -1,7 +1,7 @@
 /*
   xsns_78_xezo.ino - EZO family I2C driver support for Tasmota
 
-  Copyright (C) 2020  Christopher Tremblay
+  Copyright (C) 2021  Christopher Tremblay
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -77,7 +77,11 @@ const char *const EZOSupport[EZO_ADDR_n] PROGMEM = {
 #else
   EZOStruct::id,
 #endif
-  EZOStruct::id,  // "PMP"
+#ifdef USE_EZOPMP
+  EZOPMP::id,
+#else
+  EZOStruct::id,
+#endif
 #ifdef USE_EZOFLO
   EZOFLO::id,
 #else
@@ -256,6 +260,9 @@ private:
 #endif
 #ifdef USE_EZORTD
                   CREATE_EZO_CLASS(RTD)
+#endif
+#ifdef USE_EZOPMP
+                  CREATE_EZO_CLASS(PMP)
 #endif
 #ifdef USE_EZOFLO
                   CREATE_EZO_CLASS(FLO)

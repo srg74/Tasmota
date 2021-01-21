@@ -1,7 +1,7 @@
 /*
   xdrv_10_rules.ino - rule support for Tasmota
 
-  Copyright (C) 2020  ESP Easy Group and Theo Arends
+  Copyright (C) 2021  ESP Easy Group and Theo Arends
 
   This program is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -171,6 +171,7 @@ struct RULES {
   uint16_t mems_event = 0;   // Bitmask supporting MAX_RULE_MEMS bits
   bool teleperiod = false;
   bool busy = false;
+  bool no_execute = false;   // Don't actually execute rule commands
 
   char event_data[100];
 } Rules;
@@ -354,7 +355,7 @@ int32_t SetRule(uint32_t idx, const char *content, bool append = false) {
 
       len_uncompressed = strlen(Settings.rules[idx]);
       len_compressed = compressor.unishox_compress(Settings.rules[idx], len_uncompressed, nullptr /* dry-run */, MAX_RULE_SIZE + 8);
-      AddLog_P2(LOG_LEVEL_INFO, PSTR("RUL: Stored uncompressed, would compress from %d to %d (-%d%%)"), len_uncompressed, len_compressed, 100 - changeUIntScale(len_compressed, 0, len_uncompressed, 0, 100));
+      AddLog_P(LOG_LEVEL_INFO, PSTR("RUL: Stored uncompressed, would compress from %d to %d (-%d%%)"), len_uncompressed, len_compressed, 100 - changeUIntScale(len_compressed, 0, len_uncompressed, 0, 100));
     }
 
 #endif // USE_UNISHOX_COMPRESSION
@@ -383,9 +384,9 @@ int32_t SetRule(uint32_t idx, const char *content, bool append = false) {
       Settings.rules[idx][1] = (len_in + 7) / 8;    // store original length in first bytes (4 bytes chuks)
       memcpy(&Settings.rules[idx][2], buf_out, len_compressed);
       Settings.rules[idx][len_compressed + 2] = 0;  // add NULL termination
-      AddLog_P2(LOG_LEVEL_INFO, PSTR("RUL: Compressed from %d to %d (-%d%%)"), len_in, len_compressed, 100 - changeUIntScale(len_compressed, 0, len_in, 0, 100));
-      // AddLog_P2(LOG_LEVEL_INFO, PSTR("RUL: First bytes: %02X%02X%02X%02X"), Settings.rules[idx][0], Settings.rules[idx][1], Settings.rules[idx][2], Settings.rules[idx][3]);
-      // AddLog_P2(LOG_LEVEL_INFO, PSTR("RUL: GetRuleLenStorage = %d"), GetRuleLenStorage(idx));
+      AddLog_P(LOG_LEVEL_INFO, PSTR("RUL: Compressed from %d to %d (-%d%%)"), len_in, len_compressed, 100 - changeUIntScale(len_compressed, 0, len_in, 0, 100));
+      // AddLog_P(LOG_LEVEL_INFO, PSTR("RUL: First bytes: %02X%02X%02X%02X"), Settings.rules[idx][0], Settings.rules[idx][1], Settings.rules[idx][2], Settings.rules[idx][3]);
+      // AddLog_P(LOG_LEVEL_INFO, PSTR("RUL: GetRuleLenStorage = %d"), GetRuleLenStorage(idx));
     } else {
       len_compressed = -1;    // failed
       // clear rule cache, so it will be reloaded from Settings
@@ -415,7 +416,7 @@ bool RulesRuleMatch(uint8_t rule_set, String &event, String &rule, bool stop_all
   // Step1: Analyse rule
   String rule_expr = rule;                             // "TELE-INA219#CURRENT>0.100"
   if (Rules.teleperiod) {
-    int ppos = rule_expr.indexOf("TELE-");             // "TELE-INA219#CURRENT>0.100" or "INA219#CURRENT>0.100"
+    int ppos = rule_expr.indexOf(F("TELE-"));             // "TELE-INA219#CURRENT>0.100" or "INA219#CURRENT>0.100"
     if (ppos == -1) { return false; }                  // No pre-amble in rule
     rule_expr = rule.substring(5);                     // "INA219#CURRENT>0.100" or "SYSTEM#BOOT"
   }
@@ -427,7 +428,7 @@ bool RulesRuleMatch(uint8_t rule_set, String &event, String &rule, bool stop_all
   // rule_param = "0.100" or "%VAR1%"
 
 #ifdef DEBUG_RULES
-//  AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL-RM1: expr %s, name %s, param %s"), rule_expr.c_str(), rule_name.c_str(), rule_param.c_str());
+//  AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL-RM1: expr %s, name %s, param %s"), rule_expr.c_str(), rule_name.c_str(), rule_param.c_str());
 #endif
 
   char rule_svalue[80] = { 0 };
@@ -493,7 +494,7 @@ bool RulesRuleMatch(uint8_t rule_set, String &event, String &rule, bool stop_all
   // Step2: Search rule_name
   int pos;
   int rule_name_idx = 0;
-  if ((pos = rule_name.indexOf("[")) > 0) {            // "SUBTYPE1#CURRENT[1]"
+  if ((pos = rule_name.indexOf(F("["))) > 0) {            // "SUBTYPE1#CURRENT[1]"
     rule_name_idx = rule_name.substring(pos +1).toInt();
     if ((rule_name_idx < 1) || (rule_name_idx > 6)) {  // Allow indexes 1 to 6
       rule_name_idx = 1;
@@ -503,18 +504,18 @@ bool RulesRuleMatch(uint8_t rule_set, String &event, String &rule, bool stop_all
 
   String buf = event;   // copy the string into a new buffer that will be modified
 
-//AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL-RM2: RulesRuleMatch |%s|"), buf.c_str());
+//AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL-RM2: RulesRuleMatch |%s|"), buf.c_str());
 
   JsonParser parser((char*)buf.c_str());
   JsonParserObject obj = parser.getRootObject();
   if (!obj) {
-//    AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL: Event too long (%d)"), event.length());
-    AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL: No valid JSON (%s)"), buf.c_str());
+//    AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL: Event too long (%d)"), event.length());
+    AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL: No valid JSON (%s)"), buf.c_str());
     return false; // No valid JSON data
   }
   String subtype;
   uint32_t i = 0;
-  while ((pos = rule_name.indexOf("#")) > 0) {         // "SUBTYPE1#SUBTYPE2#CURRENT"
+  while ((pos = rule_name.indexOf(F("#"))) > 0) {         // "SUBTYPE1#SUBTYPE2#CURRENT"
     subtype = rule_name.substring(0, pos);
     obj = obj[subtype.c_str()].getObject();
     if (!obj) { return false; }                        // not found
@@ -539,7 +540,7 @@ bool RulesRuleMatch(uint8_t rule_set, String &event, String &rule, bool stop_all
   }
 
 #ifdef DEBUG_RULES
-  AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL-RM3: Name %s, Value |%s|, TrigCnt %d, TrigSt %d, Source %s, Json |%s|"),
+  AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL-RM3: Name %s, Value |%s|, TrigCnt %d, TrigSt %d, Source %s, Json |%s|"),
     rule_name.c_str(), rule_svalue, Rules.trigger_count[rule_set], bitRead(Rules.triggers[rule_set],
     Rules.trigger_count[rule_set]), event.c_str(), (str_value[0] != '\0') ? str_value : "none");
 #endif
@@ -584,7 +585,7 @@ bool RulesRuleMatch(uint8_t rule_set, String &event, String &rule, bool stop_all
 
   if (stop_all_rules) { match = false; }
 
-//AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL-RM4: Match 1 %d, Triggers %08X, TriggerCount %d"), match, Rules.triggers[rule_set], Rules.trigger_count[rule_set]);
+//AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL-RM4: Match 1 %d, Triggers %08X, TriggerCount %d"), match, Rules.triggers[rule_set], Rules.trigger_count[rule_set]);
 
   if (bitRead(Settings.rule_once, rule_set)) {
     if (match) {                                       // Only allow match state changes
@@ -598,7 +599,7 @@ bool RulesRuleMatch(uint8_t rule_set, String &event, String &rule, bool stop_all
     }
   }
 
-//AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL-RM5: Match 2 %d, Triggers %08X, TriggerCount %d"), match, Rules.triggers[rule_set], Rules.trigger_count[rule_set]);
+//AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL-RM5: Match 2 %d, Triggers %08X, TriggerCount %d"), match, Rules.triggers[rule_set], Rules.trigger_count[rule_set]);
 
   return match;
 }
@@ -670,7 +671,7 @@ bool RuleSetProcess(uint8_t rule_set, String &event_saved)
 
   delay(0);                                               // Prohibit possible loop software watchdog
 
-//AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL-RP1: Event = %s, Rule = %s"), event_saved.c_str(), Settings.rules[rule_set]);
+//AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL-RP1: Event = %s, Rule = %s"), event_saved.c_str(), Settings.rules[rule_set]);
 
   String rules = GetRule(rule_set);
 
@@ -685,14 +686,14 @@ bool RuleSetProcess(uint8_t rule_set, String &event_saved)
 
     String rule = rules;
     rule.toUpperCase();                                   // "ON INA219#CURRENT>0.100 DO BACKLOG DIMMER 10;COLOR 100000 ENDON"
-    if (!rule.startsWith("ON ")) { return serviced; }     // Bad syntax - Nothing to start on
+    if (!rule.startsWith(F("ON "))) { return serviced; }     // Bad syntax - Nothing to start on
 
-    int pevt = rule.indexOf(" DO ");
+    int pevt = rule.indexOf(F(" DO "));
     if (pevt == -1) { return serviced; }                  // Bad syntax - Nothing to do
     String event_trigger = rule.substring(3, pevt);       // "INA219#CURRENT>0.100"
 
-    plen = rule.indexOf(" ENDON");
-    plen2 = rule.indexOf(" BREAK");
+    plen = rule.indexOf(F(" ENDON"));
+    plen2 = rule.indexOf(F(" BREAK"));
     if ((plen == -1) && (plen2 == -1)) { return serviced; } // Bad syntax - No ENDON neither BREAK
 
     if (plen == -1) { plen = 9999; }
@@ -704,10 +705,11 @@ bool RuleSetProcess(uint8_t rule_set, String &event_saved)
     String event = event_saved;
 
 #ifdef DEBUG_RULES
-//    AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL-RP2: Event |%s|, Rule |%s|, Command(s) |%s|"), event.c_str(), event_trigger.c_str(), commands.c_str());
+//    AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL-RP2: Event |%s|, Rule |%s|, Command(s) |%s|"), event.c_str(), event_trigger.c_str(), commands.c_str());
 #endif
 
     if (RulesRuleMatch(rule_set, event, event_trigger, stop_all_rules)) {
+      if (Rules.no_execute) return true;
       if (plen == plen2) { stop_all_rules = true; }       // If BREAK was used on a triggered rule, Stop execution of this rule set
       commands.trim();
       String ucommand = commands;
@@ -715,10 +717,10 @@ bool RuleSetProcess(uint8_t rule_set, String &event_saved)
 
 //      if (!ucommand.startsWith("BACKLOG")) { commands = "backlog " + commands; }  // Always use Backlog to prevent power race exception
       // Use Backlog with event to prevent rule event loop exception unless IF is used which uses an implicit backlog
-      if ((ucommand.indexOf("IF ") == -1) &&
-          (ucommand.indexOf("EVENT ") != -1) &&
-          (ucommand.indexOf("BACKLOG ") == -1)) {
-        commands = "backlog " + commands;
+      if ((ucommand.indexOf(F("IF ")) == -1) &&
+          (ucommand.indexOf(F("EVENT ")) != -1) &&
+          (ucommand.indexOf(F("BACKLOG ")) == -1)) {
+        commands = String(F("backlog ")) + commands;
       }
 
       RulesVarReplace(commands, F("%VALUE%"), Rules.event_value);
@@ -755,7 +757,7 @@ bool RuleSetProcess(uint8_t rule_set, String &event_saved)
       char command[commands.length() +1];
       strlcpy(command, commands.c_str(), sizeof(command));
 
-      AddLog_P2(LOG_LEVEL_INFO, PSTR("RUL: %s performs \"%s\""), event_trigger.c_str(), command);
+      AddLog_P(LOG_LEVEL_INFO, PSTR("RUL: %s performs \"%s\""), event_trigger.c_str(), command);
 
 //      Response_P(S_JSON_COMMAND_SVALUE, D_CMND_RULE, D_JSON_INITIATED);
 //      MqttPublishPrefixTopic_P(RESULT_OR_STAT, PSTR(D_CMND_RULE));
@@ -785,7 +787,7 @@ bool RulesProcessEvent(char *json_event)
   ShowFreeMem(PSTR("RulesProcessEvent"));
 #endif
 
-//AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL: ProcessEvent |%s|"), json_event);
+//AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL: ProcessEvent |%s|"), json_event);
 
   String event_saved = json_event;
   // json_event = {"INA219":{"Voltage":4.494,"Current":0.020,"Power":0.089}}
@@ -799,7 +801,7 @@ bool RulesProcessEvent(char *json_event)
   }
   event_saved.toUpperCase();
 
-//AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL: Event |%s|"), event_saved.c_str());
+//AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL: Event |%s|"), event_saved.c_str());
 
   for (uint32_t i = 0; i < MAX_RULE_SETS; i++) {
     if (GetRuleLen(i) && bitRead(Settings.rule_enabled, i)) {
@@ -972,9 +974,8 @@ void RulesEvery100ms(void)
 
 void RulesEverySecond(void)
 {
+  char json_event[120];
   if (Settings.rule_enabled && !Rules.busy) {  // Any rule enabled
-    char json_event[120];
-
     if (RtcTime.valid) {
       if ((TasmotaGlobal.uptime > 60) && (RtcTime.minute != Rules.last_minute)) {  // Execute from one minute after restart every minute only once
         Rules.last_minute = RtcTime.minute;
@@ -982,10 +983,12 @@ void RulesEverySecond(void)
         RulesProcessEvent(json_event);
       }
     }
-    for (uint32_t i = 0; i < MAX_RULE_TIMERS; i++) {
-      if (Rules.timer[i] != 0L) {           // Timer active?
-        if (TimeReached(Rules.timer[i])) {  // Timer finished?
-          Rules.timer[i] = 0L;              // Turn off this timer
+  }
+  for (uint32_t i = 0; i < MAX_RULE_TIMERS; i++) {
+    if (Rules.timer[i] != 0L) {           // Timer active?
+      if (TimeReached(Rules.timer[i])) {  // Timer finished?
+        Rules.timer[i] = 0L;              // Turn off this timer
+        if (Settings.rule_enabled && !Rules.busy) {  // Any rule enabled
           snprintf_P(json_event, sizeof(json_event), PSTR("{\"Rules\":{\"Timer\":%d}}"), i +1);
           RulesProcessEvent(json_event);
         }
@@ -1035,13 +1038,13 @@ bool RulesMqttData(void)
   bool serviced = false;
   String sTopic = XdrvMailbox.topic;
   String sData = XdrvMailbox.data;
-  //AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL: MQTT Topic %s, Event %s"), XdrvMailbox.topic, XdrvMailbox.data);
+  //AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL: MQTT Topic %s, Event %s"), XdrvMailbox.topic, XdrvMailbox.data);
   MQTT_Subscription event_item;
   //Looking for matched topic
   for (uint32_t index = 0; index < subscriptions.size(); index++) {
     event_item = subscriptions.get(index);
 
-    //AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL: Match MQTT message Topic %s with subscription topic %s"), sTopic.c_str(), event_item.Topic.c_str());
+    //AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL: Match MQTT message Topic %s with subscription topic %s"), sTopic.c_str(), event_item.Topic.c_str());
     if (sTopic.startsWith(event_item.Topic)) {
       //This topic is subscribed by us, so serve it
       serviced = true;
@@ -1118,7 +1121,7 @@ void CmndSubscribe(void)
         }
       }
     }
-    //AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL: Subscribe command with parameters: %s, %s, %s."), event_name.c_str(), topic.c_str(), key.c_str());
+    //AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL: Subscribe command with parameters: %s, %s, %s."), event_name.c_str(), topic.c_str(), key.c_str());
     event_name.toUpperCase();
     if (event_name.length() > 0 && topic.length() > 0) {
       //Search all subscriptions
@@ -1139,7 +1142,7 @@ void CmndSubscribe(void)
           topic.concat("/#");
         }
       }
-      //AddLog_P2(LOG_LEVEL_DEBUG, PSTR("RUL: New topic: %s."), topic.c_str());
+      //AddLog_P(LOG_LEVEL_DEBUG, PSTR("RUL: New topic: %s."), topic.c_str());
       //MQTT Subscribe
       subscription_item.Event = event_name;
       subscription_item.Topic = topic.substring(0, topic.length() - 2);   //Remove "/#" so easy to match
@@ -1723,7 +1726,7 @@ bool evaluateLogicalExpression(const char * expression, int len)
   memcpy(expbuff, expression, len);
   expbuff[len] = '\0';
 
-  //AddLog_P2(LOG_LEVEL_DEBUG, PSTR("EvalLogic: |%s|"), expbuff);
+  //AddLog_P(LOG_LEVEL_DEBUG, PSTR("EvalLogic: |%s|"), expbuff);
   char * pointer = expbuff;
   LinkedList<bool> values;
   LinkedList<int8_t> logicOperators;
@@ -1849,7 +1852,7 @@ void ExecuteCommandBlock(const char * commands, int len)
   memcpy(cmdbuff, commands, len);
   cmdbuff[len] = '\0';
 
-  //AddLog_P2(LOG_LEVEL_DEBUG, PSTR("ExecCmd: |%s|"), cmdbuff);
+  //AddLog_P(LOG_LEVEL_DEBUG, PSTR("ExecCmd: |%s|"), cmdbuff);
   char oneCommand[len + 1];     //To put one command
   int insertPosition = 0;       //When insert into backlog, we should do it by 0, 1, 2 ...
   char * pos = cmdbuff;
@@ -2078,7 +2081,7 @@ void CmndRule(void)
         }
         int32_t res = SetRule(index - 1, ('"' == XdrvMailbox.data[0]) ? "" : XdrvMailbox.data, append);
         if (res < 0) {
-          AddLog_P2(LOG_LEVEL_ERROR, PSTR("RUL: Not enough space"));
+          AddLog_P(LOG_LEVEL_ERROR, PSTR("RUL: Not enough space"));
         }
       }
       Rules.triggers[index -1] = 0;  // Reset once flag
@@ -2098,7 +2101,7 @@ void CmndRule(void)
         } else {
           last_index = rule_len;                                    // until the end of the rule
         }
-        AddLog_P2(LOG_LEVEL_INFO, PSTR("RUL: Rule%d %s%s"),
+        AddLog_P(LOG_LEVEL_INFO, PSTR("RUL: Rule%d %s%s"),
                                         index, 0 == start_index ? PSTR("") : PSTR("+"),
                                         rule.substring(start_index, last_index).c_str());
         start_index = last_index + 1;
@@ -2121,21 +2124,30 @@ void CmndRule(void)
 
 void CmndRuleTimer(void)
 {
-  if ((XdrvMailbox.index > 0) && (XdrvMailbox.index <= MAX_RULE_TIMERS)) {
-    if (XdrvMailbox.data_len > 0) {
-#ifdef USE_EXPRESSION
-      float timer_set = evaluateExpression(XdrvMailbox.data, XdrvMailbox.data_len);
-      Rules.timer[XdrvMailbox.index -1] = (timer_set > 0) ? millis() + (1000 * timer_set) : 0;
-#else
-      Rules.timer[XdrvMailbox.index -1] = (XdrvMailbox.payload > 0) ? millis() + (1000 * XdrvMailbox.payload) : 0;
-#endif  // USE_EXPRESSION
-    }
-    ResponseClear();
-    for (uint32_t i = 0; i < MAX_RULE_TIMERS; i++) {
-      ResponseAppend_P(PSTR("%c\"T%d\":%d"), (i) ? ',' : '{', i +1, (Rules.timer[i]) ? (Rules.timer[i] - millis()) / 1000 : 0);
-    }
-    ResponseJsonEnd();
+  if (XdrvMailbox.index > MAX_RULE_TIMERS) { return; }
+
+  uint32_t i = XdrvMailbox.index;
+  uint32_t max_i = XdrvMailbox.index;
+  if (0 == i) {
+    i = 1;
+    max_i = MAX_RULE_TIMERS;
   }
+#ifdef USE_EXPRESSION
+  float timer_set = evaluateExpression(XdrvMailbox.data, XdrvMailbox.data_len);
+  timer_set = (timer_set > 0) ? millis() + (1000 * timer_set) : 0;
+#else
+  uint32_t timer_set = (XdrvMailbox.payload > 0) ? millis() + (1000 * XdrvMailbox.payload) : 0;
+#endif  // USE_EXPRESSION
+  if (XdrvMailbox.data_len > 0) {
+    for ( ; i <= max_i ; ++i ) {
+      Rules.timer[i -1] = timer_set;
+    }
+  }
+  ResponseClear();
+  for (i = 0; i < MAX_RULE_TIMERS; i++) {
+    ResponseAppend_P(PSTR("%c\"T%d\":%d"), (i) ? ',' : '{', i +1, (Rules.timer[i]) ? (Rules.timer[i] - millis()) / 1000 : 0);
+  }
+  ResponseJsonEnd();
 }
 
 void CmndEvent(void)
