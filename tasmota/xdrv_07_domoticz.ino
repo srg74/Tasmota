@@ -219,7 +219,7 @@ bool DomoticzMqttData(void) {
   uint32_t idx = domoticz.getUInt(PSTR("idx"), 0);
   int16_t nvalue = domoticz.getInt(PSTR("nvalue"), -1);
 
-  AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_DOMOTICZ "idx %d, nvalue %d"), idx, nvalue);
+  AddLog(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_DOMOTICZ "idx %d, nvalue %d"), idx, nvalue);
 
   bool found = false;
   if ((idx > 0) && (nvalue >= 0) && (nvalue <= 15)) {
@@ -371,7 +371,7 @@ void DomoticzSendData(uint32_t sensor_idx, uint32_t idx, char *data) {
       nvalue = position < 2 ? 0 : (position == 100 ? 1 : 2);
     }
 #endif  // USE_SHUTTER
-    Response_P(DOMOTICZ_MESSAGE,
+    Response_P(DOMOTICZ_MESSAGE,  // "{\"idx\":%d,\"nvalue\":%d,\"svalue\":\"%s\",\"Battery\":%d,\"RSSI\":%d}"
       idx, nvalue, data, DomoticzBatteryQuality(), DomoticzRssiQuality());
   }
   MqttPublish(domoticz_in_topic);
@@ -397,17 +397,36 @@ void DomoticzSensor(uint8_t idx, uint32_t value) {
   DomoticzSensor(idx, data);
 }
 
+void DomoticzFloatSensor(uint8_t idx, float value) {
+  uint32_t resolution = 1;
+/*
+  switch (idx) {
+    case DZ_TEMP: resolution = Settings.flag2.temperature_resolution; break;
+    case DZ_POWER_ENERGY: resolution = Settings.flag2.wattage_resolution; break;
+    case DZ_VOLTAGE: resolution = Settings.flag2.voltage_resolution; break;
+    case DZ_CURRENT: resolution = Settings.flag2.current_resolution; break;
+  }
+*/
+  if (DZ_TEMP == idx) { resolution = Settings.flag2.temperature_resolution; }
+  else if (DZ_POWER_ENERGY == idx) { resolution = Settings.flag2.wattage_resolution; }
+  else if (DZ_VOLTAGE == idx) { resolution = Settings.flag2.voltage_resolution; }
+  else if (DZ_CURRENT == idx) { resolution = Settings.flag2.current_resolution; }
+  char data[FLOATSZ];
+  dtostrfd(value, resolution, data);
+  DomoticzSensor(idx, data);
+}
+
 //void DomoticzTempHumPressureSensor(float temp, float hum, float baro = -1);
 void DomoticzTempHumPressureSensor(float temp, float hum, float baro) {
   char temperature[FLOATSZ];
-  dtostrfd(temp, 2, temperature);
+  dtostrfd(temp, Settings.flag2.temperature_resolution, temperature);
   char humidity[FLOATSZ];
-  dtostrfd(hum, 2, humidity);
+  dtostrfd(hum, Settings.flag2.humidity_resolution, humidity);
 
   char data[32];
   if (baro > -1) {
     char pressure[FLOATSZ];
-    dtostrfd(baro, 2, pressure);
+    dtostrfd(baro, Settings.flag2.pressure_resolution, pressure);
 
     snprintf_P(data, sizeof(data), PSTR("%s;%s;%d;%s;5"), temperature, humidity, DomoticzHumidityState(hum), pressure);
     DomoticzSensor(DZ_TEMP_HUM_BARO, data);
@@ -544,7 +563,7 @@ const char HTTP_FORM_DOMOTICZ_TIMER[] PROGMEM =
 void HandleDomoticzConfiguration(void) {
   if (!HttpCheckPriviledgedAccess()) { return; }
 
-  AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_DOMOTICZ));
+  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_DOMOTICZ));
 
   if (Webserver->hasArg(F("save"))) {
     DomoticzSaveSettings();

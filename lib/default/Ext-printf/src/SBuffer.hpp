@@ -52,6 +52,20 @@ public:
     delete[] _buf;
   }
 
+  // increase the internal buffer if needed
+  // do nothing if the buffer is big enough
+  void reserve(const size_t size) {
+    if (size > _buf->size) {
+      // we need to increase the buffer size
+      SBuffer_impl * new_buf = (SBuffer_impl*) new char[size+4];   // add 4 bytes for size and len
+      new_buf->size = size;
+      new_buf->len = _buf->len;
+      memmove(&new_buf->buf, &_buf->buf, _buf->len);               // copy buffer
+      delete[] _buf;
+      _buf = new_buf;
+    }
+  }
+
   inline void setLen(const size_t len) {
     uint16_t old_len = _buf->len;
     _buf->len = (len <= _buf->size) ? len : _buf->size;
@@ -116,6 +130,13 @@ public:
       _buf->buf[_buf->len++] = data >> 56;
     }
     return _buf->len;
+  }
+
+  void replace(const SBuffer &buf2) {
+    uint32_t len = buf2.len();
+    reserve(len);
+    setLen(0);      // clear buffer
+    addBuffer(buf2);
   }
 
   size_t addBuffer(const SBuffer &buf2) {
@@ -237,6 +258,21 @@ public:
     return buf2;
   }
 
+  // nullptr accepted
+  static bool equalsSBuffer(const class SBuffer * buf1, const class SBuffer * buf2) {
+    if (buf1 == buf2) { return true; }
+    if (!buf1 && (buf2->len() == 0)) { return true; }
+    if (!buf2 && (buf1->len() == 0)) { return true; }
+    if (!buf1 || !buf2) { return false; }   // at least one buf is not empty
+    // we know that both buf1 and buf2 are non-null
+    if (buf1->len() != buf2->len()) { return false; }
+    size_t len = buf1->len();
+    for (uint32_t i=0; i<len; i++) {
+      if (buf1->get8(i) != buf2->get8(i)) { return false; }
+    }
+    return true;
+  }
+
 protected:
 
   static uint8_t asc2byte(char chr) {
@@ -269,18 +305,3 @@ public:
     _buf = nullptr;
   }
 } PreAllocatedSBuffer;
-
-// nullptr accepted
-bool equalsSBuffer(const class SBuffer * buf1, const class SBuffer * buf2) {
-  if (buf1 == buf2) { return true; }
-  if (!buf1 && (buf2->len() == 0)) { return true; }
-  if (!buf2 && (buf1->len() == 0)) { return true; }
-  if (!buf1 || !buf2) { return false; }   // at least one buf is not empty
-  // we know that both buf1 and buf2 are non-null
-  if (buf1->len() != buf2->len()) { return false; }
-  size_t len = buf1->len();
-  for (uint32_t i=0; i<len; i++) {
-    if (buf1->get8(i) != buf2->get8(i)) { return false; }
-  }
-  return true;
-}

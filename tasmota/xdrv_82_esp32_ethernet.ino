@@ -1,5 +1,5 @@
 /*
-  xdrv_82_ethernet.ino - ESP32 (PoE) ethernet support for Tasmota
+  xdrv_82_esp32_ethernet.ino - ESP32 (PoE) ethernet support for Tasmota
 
   Copyright (C) 2021  Theo Arends
 
@@ -18,6 +18,7 @@
 */
 
 #ifdef ESP32
+#if CONFIG_IDF_TARGET_ESP32
 #ifdef USE_ETHERNET
 /*********************************************************************************************\
  * Ethernet support for ESP32
@@ -37,14 +38,14 @@
  * GPIO23 = ETH MDC
  * #define ETH_TYPE          ETH_PHY_LAN8720
  * #define ETH_CLKMODE       ETH_CLOCK_GPIO17_OUT
- * #define ETH_ADDR          0
+ * #define ETH_ADDRESS       0
  *
  * {"NAME":"wESP32","GPIO":[0,0,1,0,1,1,0,0,1,1,1,1,5568,5600,1,0,0,0,0,1,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,1],"FLAG":0,"BASE":1}
  * GPIO16 = ETH MDC
  * GPIO17 = ETH MDIO
  * #define ETH_TYPE          ETH_PHY_LAN8720
  * #define ETH_CLKMODE       ETH_CLOCK_GPIO0_IN
- * #define ETH_ADDR          0
+ * #define ETH_ADDRESS       0
  *
  * {"NAME":"WT32-ETH01","GPIO":[1,1,1,1,1,1,0,0,1,0,1,1,3840,576,5600,0,0,0,0,5568,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,1],"FLAG":0,"BASE":1}
  * GPIO16 = Force Hi
@@ -52,7 +53,7 @@
  * GPIO23 = ETH MDC
  * #define ETH_TYPE          ETH_PHY_LAN8720
  * #define ETH_CLKMODE       ETH_CLOCK_GPIO0_IN
- * #define ETH_ADDR          1
+ * #define ETH_ADDRESS       1
  *
 \*********************************************************************************************/
 
@@ -65,8 +66,8 @@
 
 //********************************************************************************************
 
-#ifndef ETH_ADDR
-#define ETH_ADDR          0                      // esp_eth.h eth_phy_base_t:   0 = PHY0 .. 31 = PHY31
+#ifndef ETH_ADDRESS
+#define ETH_ADDRESS       0                      // esp_eth.h eth_phy_base_t:   0 = PHY0 .. 31 = PHY31
 #endif
 
 #ifndef ETH_TYPE
@@ -85,27 +86,27 @@ char eth_hostname[sizeof(TasmotaGlobal.hostname)];
 void EthernetEvent(WiFiEvent_t event) {
   switch (event) {
     case SYSTEM_EVENT_ETH_START:
-      AddLog_P(LOG_LEVEL_DEBUG, PSTR("ETH: " D_ATTEMPTING_CONNECTION));
+      AddLog(LOG_LEVEL_DEBUG, PSTR("ETH: " D_ATTEMPTING_CONNECTION));
       ETH.setHostname(eth_hostname);
       break;
     case SYSTEM_EVENT_ETH_CONNECTED:
-      AddLog_P(LOG_LEVEL_INFO, PSTR("ETH: " D_CONNECTED " at %dMbps%s"),
+      AddLog(LOG_LEVEL_INFO, PSTR("ETH: " D_CONNECTED " at %dMbps%s"),
         ETH.linkSpeed(), (ETH.fullDuplex()) ? " Full Duplex" : "");
       break;
     case SYSTEM_EVENT_ETH_GOT_IP:
-      AddLog_P(LOG_LEVEL_DEBUG, PSTR("ETH: Mac %s, IPAddress %s, Hostname %s"),
-        ETH.macAddress().c_str(), ETH.localIP().toString().c_str(), eth_hostname);
+      AddLog(LOG_LEVEL_DEBUG, PSTR("ETH: Mac %s, IPAddress %_I, Hostname %s"),
+        ETH.macAddress().c_str(), (uint32_t)ETH.localIP(), eth_hostname);
       Settings.ipv4_address[1] = (uint32_t)ETH.gatewayIP();
       Settings.ipv4_address[2] = (uint32_t)ETH.subnetMask();
       Settings.ipv4_address[3] = (uint32_t)ETH.dnsIP();
       TasmotaGlobal.global_state.eth_down = 0;
       break;
     case SYSTEM_EVENT_ETH_DISCONNECTED:
-      AddLog_P(LOG_LEVEL_INFO, PSTR("ETH: Disconnected"));
+      AddLog(LOG_LEVEL_INFO, PSTR("ETH: Disconnected"));
       TasmotaGlobal.global_state.eth_down = 1;
       break;
     case SYSTEM_EVENT_ETH_STOP:
-      AddLog_P(LOG_LEVEL_DEBUG, PSTR("ETH: Stopped"));
+      AddLog(LOG_LEVEL_DEBUG, PSTR("ETH: Stopped"));
       TasmotaGlobal.global_state.eth_down = 1;
       break;
     default:
@@ -116,8 +117,14 @@ void EthernetEvent(WiFiEvent_t event) {
 void EthernetInit(void) {
   if (!Settings.flag4.network_ethernet) { return; }
   if (!PinUsed(GPIO_ETH_PHY_MDC) && !PinUsed(GPIO_ETH_PHY_MDIO)) {
-    AddLog_P(LOG_LEVEL_DEBUG, PSTR("ETH: No ETH MDC and/or ETH MDIO GPIO defined"));
+    AddLog(LOG_LEVEL_DEBUG, PSTR("ETH: No ETH MDC and/or ETH MDIO GPIO defined"));
     return;
+  }
+
+  if (WT32_ETH01 == TasmotaGlobal.module_type) {
+    Settings.eth_address = 1;                    // EthAddress
+    Settings.eth_type = ETH_PHY_LAN8720;         // EthType
+    Settings.eth_clk_mode = ETH_CLOCK_GPIO0_IN;  // EthClockMode
   }
 
 //  snprintf_P(Eth.hostname, sizeof(Eth.hostname), PSTR("%s_eth"), TasmotaGlobal.hostname);
@@ -130,7 +137,7 @@ void EthernetInit(void) {
   int eth_mdc = Pin(GPIO_ETH_PHY_MDC);
   int eth_mdio = Pin(GPIO_ETH_PHY_MDIO);
   if (!ETH.begin(Settings.eth_address, eth_power, eth_mdc, eth_mdio, (eth_phy_type_t)Settings.eth_type, (eth_clock_mode_t)Settings.eth_clk_mode)) {
-    AddLog_P(LOG_LEVEL_DEBUG, PSTR("ETH: Bad PHY type or init error"));
+    AddLog(LOG_LEVEL_DEBUG, PSTR("ETH: Bad PHY type or init error"));
   };
 }
 
@@ -215,4 +222,5 @@ bool Xdrv82(uint8_t function) {
 }
 
 #endif  // USE_ETHERNET
+#endif  // CONFIG_IDF_TARGET_ESP32
 #endif  // ESP32

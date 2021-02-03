@@ -32,6 +32,13 @@
 WiFiClient EspClient;                     // Wifi Client - non-TLS
 
 const char kMqttCommands[] PROGMEM = "|"  // No prefix
+  // SetOption synonyms
+  D_SO_MQTTJSONONLY "|" 
+#ifdef USE_MQTT_TLS
+  D_SO_MQTTTLS "|"
+#endif
+  D_SO_MQTTNORETAIN "|" D_SO_MQTTDETACHRELAY "|"
+  // regular commands
 #if defined(USE_MQTT_TLS) && !defined(USE_MQTT_TLS_CA_CERT)
   D_CMND_MQTTFINGERPRINT "|"
 #endif
@@ -42,6 +49,19 @@ const char kMqttCommands[] PROGMEM = "|"  // No prefix
   D_CMND_MQTTHOST "|" D_CMND_MQTTPORT "|" D_CMND_MQTTRETRY "|" D_CMND_STATETEXT "|" D_CMND_MQTTCLIENT "|"
   D_CMND_FULLTOPIC "|" D_CMND_PREFIX "|" D_CMND_GROUPTOPIC "|" D_CMND_TOPIC "|" D_CMND_PUBLISH "|" D_CMND_MQTTLOG "|"
   D_CMND_BUTTONTOPIC "|" D_CMND_SWITCHTOPIC "|" D_CMND_BUTTONRETAIN "|" D_CMND_SWITCHRETAIN "|" D_CMND_POWERRETAIN "|" D_CMND_SENSORRETAIN ;
+
+SO_SYNONYMS(kMqttSynonyms,
+  90,
+#ifdef USE_MQTT_TLS
+  103,
+#endif
+  104, 114
+);
+
+// const uint8_t kMqttSynonyms[] PROGMEM = {
+//   4,  // number of synonyms
+//   90, 103, 104, 114,
+// };
 
 void (* const MqttCommand[])(void) PROGMEM = {
 #if defined(USE_MQTT_TLS) && !defined(USE_MQTT_TLS_CA_CERT)
@@ -273,12 +293,12 @@ void MqttRetryCounter(uint8_t value) {
 }
 
 void MqttSubscribe(const char *topic) {
-  AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_MQTT D_SUBSCRIBE_TO " %s"), topic);
+  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_MQTT D_SUBSCRIBE_TO " %s"), topic);
   MqttSubscribeLib(topic);
 }
 
 void MqttUnsubscribe(const char *topic) {
-  AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_MQTT D_UNSUBSCRIBE_FROM " %s"), topic);
+  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_MQTT D_UNSUBSCRIBE_FROM " %s"), topic);
   MqttUnsubscribeLib(topic);
 }
 
@@ -381,7 +401,7 @@ void MqttPublishPrefixTopic_P(uint32_t prefix, const char* subtopic, bool retain
     free(mqtt_save);
 
     bool result = MqttClient.publish(romram, TasmotaGlobal.mqtt_data, false);
-    AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_MQTT "Updated shadow: %s"), romram);
+    AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_MQTT "Updated shadow: %s"), romram);
     yield();  // #3313
   }
 #endif // USE_MQTT_AWS_IOT
@@ -475,7 +495,7 @@ void MqttDisconnected(int state) {
 
   MqttClient.disconnect();
 
-  AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_CONNECT_FAILED_TO " %s:%d, rc %d. " D_RETRY_IN " %d " D_UNIT_SECOND), SettingsText(SET_MQTT_HOST), Settings.mqtt_port, state, Mqtt.retry_counter);
+  AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_CONNECT_FAILED_TO " %s:%d, rc %d. " D_RETRY_IN " %d " D_UNIT_SECOND), SettingsText(SET_MQTT_HOST), Settings.mqtt_port, state, Mqtt.retry_counter);
   TasmotaGlobal.rules_flag.mqtt_disconnected = 1;
 }
 
@@ -483,7 +503,7 @@ void MqttConnected(void) {
   char stopic[TOPSZ];
 
   if (Mqtt.allowed) {
-    AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_CONNECTED));
+    AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_CONNECTED));
     Mqtt.connected = true;
     Mqtt.retry_counter = 0;
     Mqtt.retry_counter_delay = 1;
@@ -604,7 +624,7 @@ void MqttReconnect(void) {
 #endif
 #endif
 
-  AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_ATTEMPTING_CONNECTION));
+  AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT D_ATTEMPTING_CONNECTION));
 
   char *mqtt_user = nullptr;
   char *mqtt_pwd = nullptr;
@@ -680,21 +700,21 @@ void MqttReconnect(void) {
 #ifdef USE_MQTT_TLS
     if (Mqtt.mqtt_tls) {
 #ifdef ESP8266
-      AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "TLS connected in %d ms, max ThunkStack used %d"),
+      AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "TLS connected in %d ms, max ThunkStack used %d"),
         millis() - mqtt_connect_time, tlsClient->getMaxThunkStackUse());
 #elif defined(ESP32)
-      AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "TLS connected in %d ms, stack low mark %d"),
+      AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "TLS connected in %d ms, stack low mark %d"),
         millis() - mqtt_connect_time, uxTaskGetStackHighWaterMark(nullptr));
 #endif
       if (!tlsClient->getMFLNStatus()) {
-        AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "MFLN not supported by TLS server"));
+        AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "MFLN not supported by TLS server"));
       }
 #ifndef USE_MQTT_TLS_CA_CERT  // don't bother with fingerprints if using CA validation
       const uint8_t *recv_fingerprint = tlsClient->getRecvPubKeyFingerprint();
       // create a printable version of the fingerprint received
       char buf_fingerprint[64];
       ToHex_P(recv_fingerprint, 20, buf_fingerprint, sizeof(buf_fingerprint), ' ');
-      AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_MQTT "Server fingerprint: %s"), buf_fingerprint);
+      AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_MQTT "Server fingerprint: %s"), buf_fingerprint);
 
       bool learned = false;
 
@@ -713,7 +733,7 @@ void MqttReconnect(void) {
       }
 
       if (learned) {
-        AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "Fingerprint learned: %s"), buf_fingerprint);
+        AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "Fingerprint learned: %s"), buf_fingerprint);
 
         SettingsSaveAll();  // save settings
       }
@@ -724,7 +744,7 @@ void MqttReconnect(void) {
   } else {
 #ifdef USE_MQTT_TLS
     if (Mqtt.mqtt_tls) {
-      AddLog_P(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "TLS connection error: %d"), tlsClient->getLastError());
+      AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_MQTT "TLS connection error: %d"), tlsClient->getLastError());
     }
 #endif
     MqttDisconnected(MqttClient.state());  // status codes are documented here http://pubsubclient.knolleary.net/api.html#state
@@ -1065,7 +1085,7 @@ void CmndSensorRetain(void) {
 \*********************************************************************************************/
 #if defined(USE_MQTT_TLS) && defined(USE_MQTT_AWS_IOT)
 
-// const static uint16_t tls_spi_start_sector = FLASH_EEPROM_START + 4;  // 0xXXFF
+// const static uint16_t tls_spi_start_sector = EEPROM_LOCATION + 4;  // 0xXXFF
 // const static uint8_t* tls_spi_start    = (uint8_t*) ((tls_spi_start_sector * SPI_FLASH_SEC_SIZE) + 0x40200000);  // 0x40XFF000
 const static uint16_t tls_spi_start_sector = 0xFF;  // Force last bank of first MB
 const static uint8_t* tls_spi_start    = (uint8_t*) 0x402FF000;  // 0x402FF000
@@ -1128,7 +1148,7 @@ void CmndTlsKey(void) {
       // first copy SPI buffer into ram
       uint8_t *spi_buffer = (uint8_t*) malloc(tls_spi_len);
       if (!spi_buffer) {
-        AddLog_P(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
+        AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
         return;
       }
       memcpy_P(spi_buffer, tls_spi_start, tls_spi_len);
@@ -1142,7 +1162,7 @@ void CmndTlsKey(void) {
       if (bin_len > 0) {
         bin_buf = (uint8_t*) malloc(bin_len + 4);
         if (!bin_buf) {
-          AddLog_P(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
+          AddLog(LOG_LEVEL_ERROR, ALLOCATE_ERROR);
           free(spi_buffer);
           return;
         }
@@ -1163,7 +1183,7 @@ void CmndTlsKey(void) {
         if (bin_len > 0) {
           if (bin_len != 32) {
             // no private key was previously stored, abort
-            AddLog_P(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate must be 32 bytes: %d."), bin_len);
+            AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate must be 32 bytes: %d."), bin_len);
             free(spi_buffer);
             free(bin_buf);
             return;
@@ -1180,14 +1200,14 @@ void CmndTlsKey(void) {
         // Try to write Certificate
         if (TLS_NAME_SKEY != tls_dir.entry[0].name) {
           // no private key was previously stored, abort
-          AddLog_P(LOG_LEVEL_INFO, PSTR("TLSKey: cannot store Cert if no Key previously stored."));
+          AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: cannot store Cert if no Key previously stored."));
           free(spi_buffer);
           free(bin_buf);
           return;
         }
         if (bin_len <= 256) {
           // Certificate lenght too short
-          AddLog_P(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate length too short: %d."), bin_len);
+          AddLog(LOG_LEVEL_INFO, PSTR("TLSKey: Certificate length too short: %d."), bin_len);
           free(spi_buffer);
           free(bin_buf);
           return;
@@ -1264,7 +1284,7 @@ void HandleMqttConfiguration(void)
 {
   if (!HttpCheckPriviledgedAccess()) { return; }
 
-  AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_MQTT));
+  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_HTTP D_CONFIGURE_MQTT));
 
   if (Webserver->hasArg(F("save"))) {
     MqttSaveSettings();
@@ -1353,7 +1373,7 @@ bool Xdrv02(uint8_t function)
         break;
 #endif  // USE_WEBSERVER
       case FUNC_COMMAND:
-        result = DecodeCommand(kMqttCommands, MqttCommand);
+        result = DecodeCommand(kMqttCommands, MqttCommand, kMqttSynonyms);
         break;
     }
   }

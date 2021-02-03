@@ -102,7 +102,14 @@ void *special_malloc(uint32_t size) {
 // Handle 20k of NVM
 
 #include <nvs.h>
+
+#if CONFIG_IDF_TARGET_ESP32
 #include <rom/rtc.h>
+//#include "esp32/rom/rtc.h"
+#elif CONFIG_IDF_TARGET_ESP32S2
+#include "esp32s2/rom/rtc.h"
+#endif
+
 #include <esp_phy_init.h>
 
 void NvmLoad(const char *sNvsName, const char *sName, void *pSettings, unsigned nSettingsLen) {
@@ -150,13 +157,13 @@ void SettingsErase(uint8_t type) {
       r1 = NvmErase("qpc");
       r2 = NvmErase("main");
       r3 = TfsDeleteFile(TASM_FILE_SETTINGS);
-      AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_APPLICATION D_ERASE " Tasmota data (%d,%d,%d)"), r1, r2, r3);
+      AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_APPLICATION D_ERASE " Tasmota data (%d,%d,%d)"), r1, r2, r3);
       break;
     case 1:               // Reset 3 = SDK parameter area
     case 4:               // WIFI_FORCE_RF_CAL_ERASE = SDK parameter area
       r1 = esp_phy_erase_cal_data_in_nvs();
 //      r1 = NvmErase("cal_data");
-      AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_APPLICATION D_ERASE " PHY data (%d)"), r1);
+      AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_APPLICATION D_ERASE " PHY data (%d)"), r1);
       break;
     case 3:               // QPC Reached = QPC, Tasmota and SDK parameter area (0x0F3xxx - 0x0FFFFF)
 //      nvs_flash_erase();  // Erase RTC, PHY, sta.mac, ap.sndchan, ap.mac, Tasmota etc.
@@ -164,9 +171,9 @@ void SettingsErase(uint8_t type) {
       r2 = NvmErase("main");
 //      r3 = esp_phy_erase_cal_data_in_nvs();
 //      r3 = NvmErase("cal_data");
-//      AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_APPLICATION D_ERASE " Tasmota (%d,%d) and PHY data (%d)"), r1, r2, r3);
+//      AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_APPLICATION D_ERASE " Tasmota (%d,%d) and PHY data (%d)"), r1, r2, r3);
       r3 = TfsDeleteFile(TASM_FILE_SETTINGS);
-      AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_APPLICATION D_ERASE " Tasmota data (%d,%d,%d)"), r1, r2, r3);
+      AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_APPLICATION D_ERASE " Tasmota data (%d,%d,%d)"), r1, r2, r3);
       break;
   }
 }
@@ -196,7 +203,7 @@ void QPCWrite(const void *pSettings, unsigned nSettingsLen) {
 void NvsInfo(void) {
   nvs_stats_t nvs_stats;
   nvs_get_stats(NULL, &nvs_stats);
-  AddLog_P(LOG_LEVEL_INFO, PSTR("NVS: Used %d/%d entries, NameSpaces %d"),
+  AddLog(LOG_LEVEL_INFO, PSTR("NVS: Used %d/%d entries, NameSpaces %d"),
     nvs_stats.used_entries, nvs_stats.total_entries, nvs_stats.namespace_count);
 }
 
@@ -205,7 +212,14 @@ void NvsInfo(void) {
 //
 
 #include "Esp.h"
+
+#if CONFIG_IDF_TARGET_ESP32
 #include "rom/spi_flash.h"
+//#include "esp32/rom/spi_flash.h"
+#elif CONFIG_IDF_TARGET_ESP32S2
+#include "esp32s2/rom/spi_flash.h"
+#endif
+
 #include "esp_spi_flash.h"
 #include <memory>
 #include <soc/soc.h>
@@ -240,7 +254,7 @@ uint8_t* EspFlashMmap(uint32_t address) {
   int32_t err = spi_flash_mmap(address, 5 * SPI_FLASH_MMU_PAGE_SIZE, SPI_FLASH_MMAP_DATA, (const void **)&data, &handle);
 
 /*
-  AddLog_P(LOG_LEVEL_DEBUG, PSTR("DBG: Spi_flash_map %d"), err);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("DBG: Spi_flash_map %d"), err);
 
   spi_flash_mmap_dump();
 */
@@ -258,7 +272,7 @@ int32_t EspPartitionMmap(uint32_t action) {
     if (!partition) { return 0; }
     err = esp_partition_mmap(partition, 0, 4 * SPI_FLASH_MMU_PAGE_SIZE, SPI_FLASH_MMAP_DATA, (const void **)&TasmotaGlobal_mmap_data, &handle);
 
-    AddLog_P(LOG_LEVEL_DEBUG, PSTR("DBG: Partition start 0x%08X, Partition end 0x%08X, Mmap data 0x%08X"), partition->address, partition->size, TasmotaGlobal_mmap_data);
+    AddLog(LOG_LEVEL_DEBUG, PSTR("DBG: Partition start 0x%08X, Partition end 0x%08X, Mmap data 0x%08X"), partition->address, partition->size, TasmotaGlobal_mmap_data);
 
   } else {
     spi_flash_munmap(handle);
@@ -324,6 +338,8 @@ void DisableBrownout(void) {
 //
 
 String ESP32GetResetReason(uint32_t cpu_no) {
+
+#if CONFIG_IDF_TARGET_ESP32
 	// tools\sdk\include\esp32\rom\rtc.h
   switch (rtc_get_reset_reason(cpu_no)) {
     case POWERON_RESET          : return F("Vbat power on reset");                              // 1
@@ -342,6 +358,27 @@ String ESP32GetResetReason(uint32_t cpu_no) {
     case RTCWDT_BROWN_OUT_RESET : return F("Reset when the vdd voltage is not stable");         // 15
     case RTCWDT_RTC_RESET       : return F("RTC Watch dog reset digital core and rtc module");  // 16
   }
+#elif CONFIG_IDF_TARGET_ESP32S2
+	// tools\sdk\esp32\include\esp_rom\include\esp32s2\rom\rtc.h
+  switch (rtc_get_reset_reason(cpu_no)) {
+    case POWERON_RESET          : return F("Vbat power on reset");                              // 1
+    case RTC_SW_SYS_RESET       : return F("Software reset digital core");                      // 3
+    case DEEPSLEEP_RESET        : return F("Deep Sleep reset digital core");                    // 5
+    case TG0WDT_SYS_RESET       : return F("Timer Group0 Watch dog reset digital core");        // 7
+    case TG1WDT_SYS_RESET       : return F("Timer Group1 Watch dog reset digital core");        // 8
+    case RTCWDT_SYS_RESET       : return F("RTC Watch dog Reset digital core");                 // 9
+    case INTRUSION_RESET        : return F("Instrusion tested to reset CPU");                   // 10
+    case TG0WDT_CPU_RESET       : return F("Time Group0 reset CPU");                            // 11
+    case RTC_SW_CPU_RESET       : return F("Software reset CPU");                               // 12
+    case RTCWDT_CPU_RESET       : return F("RTC Watch dog Reset CPU");                          // 13
+    case RTCWDT_BROWN_OUT_RESET : return F("Reset when the vdd voltage is not stable");         // 15
+    case RTCWDT_RTC_RESET       : return F("RTC Watch dog reset digital core and rtc module");  // 16
+    case TG1WDT_CPU_RESET       : return F("Time Group1 reset CPU");                            // 17
+    case SUPER_WDT_RESET        : return F("Super watchdog reset digital core and rtc module"); // 18
+    case GLITCH_RTC_RESET       : return F("Glitch reset digital core and rtc module");         // 19
+  }
+#endif
+
   return F("No meaning");                                                                       // 0 and undefined
 }
 
@@ -351,10 +388,17 @@ String ESP_getResetReason(void) {
 
 uint32_t ESP_ResetInfoReason(void) {
   RESET_REASON reason = rtc_get_reset_reason(0);
+#if CONFIG_IDF_TARGET_ESP32
   if (POWERON_RESET == reason) { return REASON_DEFAULT_RST; }
   if (SW_CPU_RESET == reason) { return REASON_SOFT_RESTART; }
   if (DEEPSLEEP_RESET == reason)  { return REASON_DEEP_SLEEP_AWAKE; }
   if (SW_RESET == reason) { return REASON_EXT_SYS_RST; }
+#elif CONFIG_IDF_TARGET_ESP32S2
+  if (POWERON_RESET == reason) { return REASON_DEFAULT_RST; }
+  if (RTC_SW_CPU_RESET == reason) { return REASON_SOFT_RESTART; }
+  if (DEEPSLEEP_RESET == reason)  { return REASON_DEEP_SLEEP_AWAKE; }
+  if (RTC_SW_SYS_RESET == reason) { return REASON_EXT_SYS_RST; }
+#endif
   return -1; //no "official error code", but should work with the current code base
 }
 
@@ -407,7 +451,7 @@ uint8_t* FlashDirectAccess(void) {
   uint32_t address = FlashWriteStartSector() * SPI_FLASH_SEC_SIZE;
   uint8_t* data = EspFlashMmap(address);
 /*
-  AddLog_P(LOG_LEVEL_DEBUG, PSTR("DBG: Flash start address 0x%08X, Mmap address 0x%08X"), address, data);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("DBG: Flash start address 0x%08X, Mmap address 0x%08X"), address, data);
 
   uint8_t buf[32];
   memcpy(buf, data, sizeof(buf));
