@@ -904,7 +904,12 @@ void Dump2log(void) {
             c=SML_SREAD;
             sprintf(&log_data[index],"%02x ",c);
             index+=3;
-            if (c==EBUS_SYNC) break;
+            if (c==EBUS_SYNC) {
+#if SML_EBUS_SKIP_SYNC_DUMPS
+              index = index == 5 ? 0 : index;
+#endif
+              break;
+            }
           } else {
             // sml
             if (sml_start==0x77) {
@@ -1415,7 +1420,7 @@ void SML_Decode(uint8_t index) {
     } else {
       // compare value
       uint8_t found=1;
-      uint32_t ebus_dval=99;
+      double ebus_dval=99;
       float mbus_dval=99;
       while (*mp!='@') {
         if (meter_desc_p[mindex].type=='o' || meter_desc_p[mindex].type=='c') {
@@ -1576,9 +1581,9 @@ void SML_Decode(uint8_t index) {
             // ebus pzem or mbus or raw
             if (*mp=='b') {
               mp++;
-              uint8_t shift=*mp&7;
-              ebus_dval>>=shift;
-              ebus_dval&=1;
+              uint8_t shift = *mp&7;
+              ebus_dval = (uint32_t)ebus_dval>>shift;
+              ebus_dval = (uint32_t)ebus_dval&1;
               mp+=2;
             }
             if (*mp=='i') {

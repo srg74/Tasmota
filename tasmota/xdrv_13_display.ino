@@ -64,6 +64,7 @@ const uint8_t DISPLAY_LOG_ROWS = 32;           // Number of lines in display log
 #define D_CMND_DISP_WIDTH "Width"
 #define D_CMND_DISP_HEIGHT "Height"
 #define D_CMND_DISP_BLINKRATE "Blinkrate"
+#define D_CMND_DISP_BATCH "Batch"
 
 enum XdspFunctions { FUNC_DISPLAY_INIT_DRIVER, FUNC_DISPLAY_INIT, FUNC_DISPLAY_EVERY_50_MSECOND, FUNC_DISPLAY_EVERY_SECOND,
                      FUNC_DISPLAY_MODEL, FUNC_DISPLAY_MODE, FUNC_DISPLAY_POWER,
@@ -72,19 +73,31 @@ enum XdspFunctions { FUNC_DISPLAY_INIT_DRIVER, FUNC_DISPLAY_INIT, FUNC_DISPLAY_E
                      FUNC_DISPLAY_DRAW_CIRCLE, FUNC_DISPLAY_FILL_CIRCLE,
                      FUNC_DISPLAY_DRAW_RECTANGLE, FUNC_DISPLAY_FILL_RECTANGLE,
                      FUNC_DISPLAY_TEXT_SIZE, FUNC_DISPLAY_FONT_SIZE, FUNC_DISPLAY_ROTATION, FUNC_DISPLAY_DRAW_STRING,
-                     FUNC_DISPLAY_DIM, FUNC_DISPLAY_BLINKRATE };
+                     FUNC_DISPLAY_DIM, FUNC_DISPLAY_BLINKRATE
+#ifdef USE_UFILESYS
+                    ,FUNC_DISPLAY_BATCH
+#endif
+                   };
 
 enum DisplayInitModes { DISPLAY_INIT_MODE, DISPLAY_INIT_PARTIAL, DISPLAY_INIT_FULL };
 
 const char kDisplayCommands[] PROGMEM = D_PRFX_DISPLAY "|"  // Prefix
   "|" D_CMND_DISP_MODEL "|" D_CMND_DISP_WIDTH "|" D_CMND_DISP_HEIGHT "|" D_CMND_DISP_MODE "|" D_CMND_DISP_REFRESH "|"
   D_CMND_DISP_DIMMER "|" D_CMND_DISP_COLS "|" D_CMND_DISP_ROWS "|" D_CMND_DISP_SIZE "|" D_CMND_DISP_FONT "|"
-  D_CMND_DISP_ROTATE "|" D_CMND_DISP_TEXT "|" D_CMND_DISP_ADDRESS "|" D_CMND_DISP_BLINKRATE ;
+  D_CMND_DISP_ROTATE "|" D_CMND_DISP_TEXT "|" D_CMND_DISP_ADDRESS "|" D_CMND_DISP_BLINKRATE
+#ifdef USE_UFILESYS
+  "|" D_CMND_DISP_BATCH
+#endif
+  ;
 
 void (* const DisplayCommand[])(void) PROGMEM = {
   &CmndDisplay, &CmndDisplayModel, &CmndDisplayWidth, &CmndDisplayHeight, &CmndDisplayMode, &CmndDisplayRefresh,
   &CmndDisplayDimmer, &CmndDisplayColumns, &CmndDisplayRows, &CmndDisplaySize, &CmndDisplayFont,
-  &CmndDisplayRotate, &CmndDisplayText, &CmndDisplayAddress, &CmndDisplayBlinkrate };
+  &CmndDisplayRotate, &CmndDisplayText, &CmndDisplayAddress, &CmndDisplayBlinkrate
+#ifdef USE_UFILESYS
+  ,&CmndDisplayBatch
+#endif
+};
 
 char *dsp_str;
 
@@ -106,6 +119,8 @@ uint8_t dsp_init;
 uint8_t dsp_font;
 uint8_t dsp_flag;
 uint8_t dsp_on;
+
+uint16_t index_colors[MAX_INDEXCOLORS];
 
 #ifdef USE_DISPLAY_MODES1TO5
 
@@ -139,95 +154,6 @@ void DisplayInit(uint8_t mode)
 void DisplayClear(void)
 {
   XdspCall(FUNC_DISPLAY_CLEAR);
-}
-
-void DisplayDrawHLine(uint16_t x, uint16_t y, int16_t len, uint16_t color)
-{
-  dsp_x = x;
-  dsp_y = y;
-  dsp_len = len;
-  dsp_color = color;
-  XdspCall(FUNC_DISPLAY_DRAW_HLINE);
-}
-
-void DisplayDrawVLine(uint16_t x, uint16_t y, int16_t len, uint16_t color)
-{
-  dsp_x = x;
-  dsp_y = y;
-  dsp_len = len;
-  dsp_color = color;
-  XdspCall(FUNC_DISPLAY_DRAW_VLINE);
-}
-
-void DisplayDrawLine(uint16_t x, uint16_t y, uint16_t x2, uint16_t y2, uint16_t color)
-{
-  dsp_x = x;
-  dsp_y = y;
-  dsp_x2 = x2;
-  dsp_y2 = y2;
-  dsp_color = color;
-  XdspCall(FUNC_DISPLAY_DRAW_LINE);
-}
-
-void DisplayDrawCircle(uint16_t x, uint16_t y, uint16_t rad, uint16_t color)
-{
-  dsp_x = x;
-  dsp_y = y;
-  dsp_rad = rad;
-  dsp_color = color;
-  XdspCall(FUNC_DISPLAY_DRAW_CIRCLE);
-}
-
-void DisplayDrawFilledCircle(uint16_t x, uint16_t y, uint16_t rad, uint16_t color)
-{
-  dsp_x = x;
-  dsp_y = y;
-  dsp_rad = rad;
-  dsp_color = color;
-  XdspCall(FUNC_DISPLAY_FILL_CIRCLE);
-}
-
-void DisplayDrawRectangle(uint16_t x, uint16_t y, uint16_t x2, uint16_t y2, uint16_t color)
-{
-  dsp_x = x;
-  dsp_y = y;
-  dsp_x2 = x2;
-  dsp_y2 = y2;
-  dsp_color = color;
-  XdspCall(FUNC_DISPLAY_DRAW_RECTANGLE);
-}
-
-void DisplayDrawFilledRectangle(uint16_t x, uint16_t y, uint16_t x2, uint16_t y2, uint16_t color)
-{
-  dsp_x = x;
-  dsp_y = y;
-  dsp_x2 = x2;
-  dsp_y2 = y2;
-  dsp_color = color;
-  XdspCall(FUNC_DISPLAY_FILL_RECTANGLE);
-}
-
-void DisplayDrawFrame(void)
-{
-  XdspCall(FUNC_DISPLAY_DRAW_FRAME);
-}
-
-void DisplaySetSize(uint8_t size)
-{
-  Settings.display_size = size &3;
-  XdspCall(FUNC_DISPLAY_TEXT_SIZE);
-}
-
-void DisplaySetFont(uint8_t font)
-{
-  Settings.display_font = font &3;
-  XdspCall(FUNC_DISPLAY_FONT_SIZE);
-}
-
-void DisplaySetRotation(uint8_t rotation)
-{
-  Settings.display_rotate = rotation &3;
-  XdspCall(FUNC_DISPLAY_ROTATION);
 }
 
 void DisplayDrawStringAt(uint16_t x, uint16_t y, char *str, uint16_t color, uint8_t flag)
@@ -363,6 +289,11 @@ uint32_t decode_te(char *line) {
 
 #define DISPLAY_BUFFER_COLS    128          // Max number of characters in linebuf
 
+uint16_t GetColorFromIndex(uint32_t index) {
+  if (index >= MAX_INDEXCOLORS) index = 0;
+  return index_colors[index];
+}
+
 void DisplayText(void)
 {
   uint8_t lpos;
@@ -468,7 +399,7 @@ void DisplayText(void)
               // color index 0-18
               cp++;
               var = atoiv(cp, &temp);
-              if (renderer) ftemp=renderer->GetColorFromIndex(temp);
+              if (renderer) ftemp = GetColorFromIndex(temp);
             } else {
               // float because it must handle unsigned 16 bit
               var = fatoiv(cp,&ftemp);
@@ -483,7 +414,7 @@ void DisplayText(void)
               // color index 0-18
               cp++;
               var = atoiv(cp, &temp);
-              if (renderer) ftemp=renderer->GetColorFromIndex(temp);
+              if (renderer) ftemp = GetColorFromIndex(temp);
             } else {
               var = fatoiv(cp,&ftemp);
             }
@@ -497,7 +428,7 @@ void DisplayText(void)
             cp += var;
             linebuf[fill] = 0;
             break;
-#if (defined(USE_SCRIPT_FATFS) && defined(USE_SCRIPT)) || defined(USE_UFILESYS)
+#ifdef USE_UFILESYS
           case 'P':
             { char *ep=strchr(cp,':');
              if (ep) {
@@ -508,17 +439,17 @@ void DisplayText(void)
              }
             }
             break;
-#endif // USE_SCRIPT_FATFS
+#endif // USE_UFILESYS
           case 'h':
             // hor line to
             var = atoiv(cp, &temp);
             cp += var;
             if (temp < 0) {
               if (renderer) renderer->writeFastHLine(disp_xpos + temp, disp_ypos, -temp, fg_color);
-              else DisplayDrawHLine(disp_xpos + temp, disp_ypos, -temp, fg_color);
+              //else DisplayDrawHLine(disp_xpos + temp, disp_ypos, -temp, fg_color);
             } else {
               if (renderer) renderer->writeFastHLine(disp_xpos, disp_ypos, temp, fg_color);
-              else DisplayDrawHLine(disp_xpos, disp_ypos, temp, fg_color);
+              //else DisplayDrawHLine(disp_xpos, disp_ypos, temp, fg_color);
             }
             disp_xpos += temp;
             break;
@@ -528,10 +459,10 @@ void DisplayText(void)
             cp += var;
             if (temp < 0) {
               if (renderer) renderer->writeFastVLine(disp_xpos, disp_ypos + temp, -temp, fg_color);
-              else DisplayDrawVLine(disp_xpos, disp_ypos + temp, -temp, fg_color);
+              //else DisplayDrawVLine(disp_xpos, disp_ypos + temp, -temp, fg_color);
             } else {
               if (renderer) renderer->writeFastVLine(disp_xpos, disp_ypos, temp, fg_color);
-              else DisplayDrawVLine(disp_xpos, disp_ypos, temp, fg_color);
+              //else DisplayDrawVLine(disp_xpos, disp_ypos, temp, fg_color);
             }
             disp_ypos += temp;
             break;
@@ -543,7 +474,7 @@ void DisplayText(void)
             var = atoiv(cp, &temp1);
             cp += var;
             if (renderer) renderer->writeLine(disp_xpos, disp_ypos, temp, temp1, fg_color);
-            else DisplayDrawLine(disp_xpos, disp_ypos, temp, temp1, fg_color);
+            //else DisplayDrawLine(disp_xpos, disp_ypos, temp, temp1, fg_color);
             disp_xpos += temp;
             disp_ypos += temp1;
             break;
@@ -552,14 +483,14 @@ void DisplayText(void)
             var = atoiv(cp, &temp);
             cp += var;
             if (renderer) renderer->drawCircle(disp_xpos, disp_ypos, temp, fg_color);
-            else DisplayDrawCircle(disp_xpos, disp_ypos, temp, fg_color);
+            //else DisplayDrawCircle(disp_xpos, disp_ypos, temp, fg_color);
             break;
           case 'K':
             // filled circle
             var = atoiv(cp, &temp);
             cp += var;
             if (renderer) renderer->fillCircle(disp_xpos, disp_ypos, temp, fg_color);
-            else DisplayDrawFilledCircle(disp_xpos, disp_ypos, temp, fg_color);
+            //else DisplayDrawFilledCircle(disp_xpos, disp_ypos, temp, fg_color);
             break;
           case 'r':
             // rectangle
@@ -569,7 +500,7 @@ void DisplayText(void)
             var = atoiv(cp, &temp1);
             cp += var;
             if (renderer) renderer->drawRect(disp_xpos, disp_ypos, temp, temp1, fg_color);
-            else DisplayDrawRectangle(disp_xpos, disp_ypos, temp, temp1, fg_color);
+            //else DisplayDrawRectangle(disp_xpos, disp_ypos, temp, temp1, fg_color);
             break;
           case 'R':
             // filled rectangle
@@ -579,7 +510,7 @@ void DisplayText(void)
             var = atoiv(cp, &temp1);
             cp += var;
             if (renderer) renderer->fillRect(disp_xpos, disp_ypos, temp, temp1, fg_color);
-            else DisplayDrawFilledRectangle(disp_xpos, disp_ypos, temp, temp1, fg_color);
+            //else DisplayDrawFilledRectangle(disp_xpos, disp_ypos, temp, temp1, fg_color);
             break;
           case 'u':
             // rounded rectangle
@@ -640,9 +571,61 @@ void DisplayText(void)
             }
             break; }
           case 'd':
+            if (*cp == 'c') {
+              cp++;
+              // define index colo
+              var = atoiv(cp, &temp);
+              cp += var;
+              cp++;
+              var = fatoiv(cp, &ftemp);
+              cp += var;
+              if (temp >= MAX_INDEXCOLORS) temp = 0;
+              index_colors[temp] = ftemp;
+              break;
+            }
+#ifdef USE_DT_VARS
+            if (*cp == 'v') {
+              cp++;
+              { int16_t num, gxp, gyp, textbcol, textfcol, font, textsize, txlen, dp;
+                var=atoiv(cp,&num);
+                cp+=var;
+                cp++;
+                var=atoiv(cp,&gxp);
+                cp+=var;
+                cp++;
+                var=atoiv(cp,&gyp);
+                cp+=var;
+                cp++;
+                var=atoiv(cp,&textbcol);
+                cp+=var;
+                cp++;
+                var=atoiv(cp,&textfcol);
+                cp+=var;
+                cp++;
+                var=atoiv(cp,&font);
+                cp+=var;
+                cp++;
+                var=atoiv(cp,&textsize);
+                cp+=var;
+                cp++;
+                var=atoiv(cp,&txlen);
+                cp+=var;
+                cp++;
+                var=atoiv(cp,&dp);
+                cp+=var;
+                cp++;
+                // text itself
+                char bbuff[32];
+                cp = get_string(bbuff, sizeof(bbuff), cp);
+                char unit[4];
+                cp = get_string(unit, sizeof(unit), cp);
+                define_dt_var(num, gxp, gyp, textbcol, textfcol, font, textsize, txlen, dp, bbuff, unit);
+              }
+            }
+#endif // USE_DT_VARS
             // force draw grafics buffer
             if (renderer) renderer->Updateframe();
-            else DisplayDrawFrame();
+            //else DisplayDrawFrame();
             break;
           case 'D':
             // set auto draw mode
@@ -653,19 +636,26 @@ void DisplayText(void)
           case 's':
             // size sx
             if (renderer) renderer->setTextSize(*cp&7);
-            else DisplaySetSize(*cp&3);
+            //else DisplaySetSize(*cp&3);
             cp += 1;
             break;
           case 'f':
             // font sx
-            if (renderer) renderer->setTextFont(*cp&7);
-            else DisplaySetFont(*cp&7);
-            cp += 1;
+            { uint8_t font = *cp&7;
+              if (renderer) renderer->setTextFont(font);
+              //else DisplaySetFont(font);
+              if (font) {
+                // for backward compatibility set size to 1 on non GFX fonts
+                if (renderer) renderer->setTextSize(1);
+                //else DisplaySetSize(1);
+              }
+              cp += 1;
+            }
             break;
           case 'a':
             // rotation angle
             if (renderer) renderer->setRotation(*cp&3);
-            else DisplaySetRotation(*cp&3);
+            //else DisplaySetRotation(*cp&3);
             cp+=1;
             break;
 
@@ -765,17 +755,17 @@ void DisplayText(void)
 
 #ifdef USE_TOUCH_BUTTONS
           case 'b':
-          { int16_t num,gxp,gyp,gxs,gys,outline,fill,textcolor,textsize; uint8_t dflg=1;
-            if (*cp=='e' || *cp=='d') {
+          { int16_t num, gxp, gyp, gxs, gys, outline, fill, textcolor, textsize; uint8_t dflg = 1, sbt = 0;
+            if (*cp == 'e' || *cp == 'd') {
               // enable disable
-              uint8_t dis=0;
-              if (*cp=='d') dis=1;
+              uint8_t dis = 0;
+              if (*cp == 'd') dis = 1;
               cp++;
-              var=atoiv(cp,&num);
-              num=num%MAX_TOUCH_BUTTONS;
-              cp+=var;
+              var = atoiv(cp, &num);
+              num = num % MAX_TOUCH_BUTTONS;
+              cp += var;
               if (buttons[num]) {
-                buttons[num]->vpower.disable=dis;
+                buttons[num]->vpower.disable = dis;
                 if (!dis) {
                   if (buttons[num]->vpower.is_virtual) buttons[num]->xdrawButton(buttons[num]->vpower.on_off);
                   else buttons[num]->xdrawButton(bitRead(TasmotaGlobal.power,num));
@@ -783,15 +773,33 @@ void DisplayText(void)
               }
               break;
             }
-            if (*cp=='-') {
+            if (*cp == '-') {
               cp++;
-              dflg=0;
+              dflg = 0;
+            }
+            if (*cp == 's') {
+              cp++;
+              sbt = 1;
             }
             var=atoiv(cp,&num);
             cp+=var;
-            cp++;
             uint8_t bflags=num>>8;
             num=num%MAX_TOUCH_BUTTONS;
+            if (*cp == 's') {
+              cp++;
+              var=atoiv(cp,&gxp);
+              if (buttons[num]) {
+                // set slider or button
+                if (buttons[num]->vpower.slider) {
+                  buttons[num]->UpdateSlider(-gxp, -gxp);
+                } else {
+                  buttons[num]->vpower.on_off = gxp;
+                  buttons[num]->xdrawButton(buttons[num]->vpower.on_off);
+                }
+              }
+              break;
+            }
+            cp++;
             var=atoiv(cp,&gxp);
             cp+=var;
             cp++;
@@ -818,32 +826,42 @@ void DisplayText(void)
             cp++;
             // text itself
             char bbuff[32];
-            cp=get_string(bbuff,sizeof(bbuff),cp);
-
+            if (!sbt) {
+              // text itself
+              cp = get_string(bbuff, sizeof(bbuff), cp);
+            }
             if (buttons[num]) {
               delete buttons[num];
             }
             if (renderer) {
               buttons[num]= new VButton();
               if (buttons[num]) {
-                buttons[num]->initButtonUL(renderer,gxp,gyp,gxs,gys,renderer->GetColorFromIndex(outline),\
-                  renderer->GetColorFromIndex(fill),renderer->GetColorFromIndex(textcolor),bbuff,textsize);
-                if (!bflags) {
-                  // power button
-                  if (dflg) buttons[num]->xdrawButton(bitRead(TasmotaGlobal.power,num));
-                  buttons[num]->vpower.is_virtual=0;
-                } else {
-                  // virtual button
-                  buttons[num]->vpower.is_virtual=1;
-                  if (bflags==2) {
-                    // push
-                    buttons[num]->vpower.is_pushbutton=1;
+                if (!sbt) {
+                  buttons[num]->vpower.slider = 0;
+                  buttons[num]->initButtonUL(renderer, gxp, gyp, gxs, gys, GetColorFromIndex(outline),\
+                    GetColorFromIndex(fill), GetColorFromIndex(textcolor), bbuff, textsize);
+                  if (!bflags) {
+                    // power button
+                    if (dflg) buttons[num]->xdrawButton(bitRead(TasmotaGlobal.power, num));
+                    buttons[num]->vpower.is_virtual = 0;
                   } else {
-                    // toggle
-                    buttons[num]->vpower.is_pushbutton=0;
+                    // virtual button
+                    buttons[num]->vpower.is_virtual = 1;
+                    if (bflags==2) {
+                      // push
+                      buttons[num]->vpower.is_pushbutton = 1;
+                    } else {
+                      // toggle
+                      buttons[num]->vpower.is_pushbutton = 0;
+                    }
+                    if (dflg) buttons[num]->xdrawButton(buttons[num]->vpower.on_off);
+                    buttons[num]->vpower.disable = !dflg;
                   }
-                  if (dflg) buttons[num]->xdrawButton(buttons[num]->vpower.on_off);
-                  buttons[num]->vpower.disable=!dflg;
+                } else {
+                  // slider
+                  buttons[num]->vpower.slider = 1;
+                  buttons[num]->SliderInit(renderer, gxp, gyp, gxs, gys, outline, GetColorFromIndex(fill),\
+                    GetColorFromIndex(textcolor), GetColorFromIndex(textsize));
                 }
               }
             }
@@ -885,9 +903,209 @@ void DisplayText(void)
     // draw buffer
     if (auto_draw&1) {
       if (renderer) renderer->Updateframe();
-      else DisplayDrawFrame();
+      //else DisplayDrawFrame();
     }
 }
+
+#ifdef USE_UFILESYS
+extern FS *ufsp;
+void Display_Text_From_File(const char *file) {
+  File fp;
+  fp = ufsp->open(file, FS_FILE_READ);
+  if (fp >= 0) {
+    char *savptr = XdrvMailbox.data;
+    char linebuff[128];
+    while (fp.available()) {
+      uint16_t index = 0;
+      while (fp.available()) {
+        uint8_t buf[1];
+        fp.read(buf,1);
+        if (buf[0]=='\n' || buf[0]=='\r') {
+          break;
+        } else {
+          linebuff[index] = buf[0];
+          index++;
+          if (index >= sizeof(linebuff) - 1) {
+            break;
+          }
+        }
+      }
+      linebuff[index] = 0;
+      char *cp = linebuff;
+      while (*cp==' ') cp++;
+      if (*cp == ';') continue;
+      //AddLog(LOG_LEVEL_INFO, PSTR("displaytext %s"), cp);
+      // execute display text here
+      XdrvMailbox.data = cp;
+      XdrvMailbox.data_len = 0;
+      DisplayText();
+    }
+    XdrvMailbox.data = savptr;
+    fp.close();
+  }
+}
+#endif
+
+
+#ifdef USE_DT_VARS
+
+#ifndef MAX_DT_VARS
+#define MAX_DT_VARS 8
+#endif // MAX_DT_VARS
+
+#define MAX_DVTSIZE 24
+
+typedef struct {
+  uint16_t xp;
+  uint16_t yp;
+  uint8_t txtbcol;
+  uint8_t txtfcol;
+  int8_t txtsiz;
+  int8_t txtlen;
+  int8_t dp;
+  int8_t font;
+  char unit[6];
+  char *jstrbuf;
+  char rstr[32];
+} DT_VARS;
+
+DT_VARS *dt_vars[MAX_DT_VARS];
+
+void define_dt_var(uint32_t num, uint32_t xp, uint32_t yp,  uint32_t txtbcol,  uint32_t txtfcol, int32_t font, int32_t txtsiz, int32_t txtlen, int32_t dp, char *jstr, char *unit) {
+  if (num >= MAX_DT_VARS) return;
+
+  if (dt_vars[num]) {
+    if (dt_vars[num]->jstrbuf) free(dt_vars[num]->jstrbuf);
+    free(dt_vars[num]);
+  }
+  //dt [dv0:100:100:0:3:2:1:10:2:WLAN#ID:uV:]
+
+  DT_VARS *dtp = (DT_VARS*)malloc(sizeof(DT_VARS));
+  if (!dtp) return;
+
+  dt_vars[num] = dtp;
+
+  dtp->xp = xp;
+  dtp->yp = yp;
+  dtp->txtbcol = txtbcol;
+  dtp->txtfcol = txtfcol;
+  dtp->font = font;
+  dtp->txtsiz = txtsiz;
+  if (txtlen > MAX_DVTSIZE) {txtlen = MAX_DVTSIZE;}
+  dtp->txtlen = txtlen;
+  dtp->dp = dp;
+  dtp->jstrbuf = (char*)malloc(strlen(jstr + 1));
+  if (!dtp->jstrbuf) {
+    free (dtp);
+    return;
+  }
+  strcpy(dtp->jstrbuf, jstr);
+  strcpy(dtp->unit,unit);
+}
+
+void draw_dt_vars(void) {
+  if (!renderer) return;
+
+  for (uint32_t cnt = 0; cnt < MAX_DT_VARS; cnt++) {
+    if (dt_vars[cnt]) {
+      if (dt_vars[cnt]->jstrbuf) {
+        // draw
+        char vstr[MAX_DVTSIZE + 7];
+        memset(vstr, ' ', sizeof(vstr));
+        strcpy(vstr, dt_vars[cnt]->rstr);
+        strcat(vstr, " ");
+        strcat(vstr, dt_vars[cnt]->unit);
+        uint16_t slen = strlen(vstr);
+        vstr[slen] = ' ';
+
+        if (!dt_vars[cnt]->txtlen) {
+            vstr[slen] = 0;
+        } else {
+            vstr[abs(int(dt_vars[cnt]->txtlen))] = 0;
+        }
+        if (dt_vars[cnt]->txtlen < 0) {
+          // right align
+          alignright(vstr);
+        }
+
+        if (dt_vars[cnt]->txtsiz > 0) {
+          renderer->setDrawMode(0);
+        } else {
+          renderer->setDrawMode(2);
+        }
+        renderer->setTextColor(GetColorFromIndex(dt_vars[cnt]->txtfcol),GetColorFromIndex(dt_vars[cnt]->txtbcol));
+        renderer->setTextFont(dt_vars[cnt]->font);
+        renderer->setTextSize(abs(dt_vars[cnt]->txtsiz));
+        renderer->DrawStringAt(dt_vars[cnt]->xp, dt_vars[cnt]->yp, vstr, GetColorFromIndex(dt_vars[cnt]->txtfcol), 0);
+
+        // reset display vars
+        renderer->setTextColor(fg_color, bg_color);
+        renderer->setDrawMode(auto_draw);
+      }
+    }
+  }
+}
+
+#define DTV_JSON_SIZE 1024
+
+void DTVarsTeleperiod(void) {
+  char *json = (char*)malloc(DTV_JSON_SIZE);
+  if (json) {
+    strlcpy(json, TasmotaGlobal.mqtt_data, DTV_JSON_SIZE);
+    get_dt_vars(json);
+    free(json);
+  }
+}
+
+void get_dt_mqtt(void) {
+  ResponseClear();
+  uint16_t script_tele_period_save = TasmotaGlobal.tele_period;
+  TasmotaGlobal.tele_period = 2;
+  XsnsNextCall(FUNC_JSON_APPEND, script_xsns_index);
+  TasmotaGlobal.tele_period = script_tele_period_save;
+  if (strlen(TasmotaGlobal.mqtt_data)) {
+    TasmotaGlobal.mqtt_data[0] = '{';
+    snprintf_P(TasmotaGlobal.mqtt_data, sizeof(TasmotaGlobal.mqtt_data), PSTR("%s}"), TasmotaGlobal.mqtt_data);
+  }
+  get_dt_vars(TasmotaGlobal.mqtt_data);
+}
+
+void get_dt_vars(char *json) {
+  if (strlen(json)) {
+    JsonParser parser(json);
+    JsonParserObject obj = parser.getRootObject();
+
+    for (uint32_t cnt = 0; cnt < MAX_DT_VARS; cnt++) {
+      if (dt_vars[cnt]) {
+        if (dt_vars[cnt]->jstrbuf) {
+          char sbuf[32];
+          uint32_t res = JsonParsePath(&obj, dt_vars[cnt]->jstrbuf, '#', NULL, sbuf, sizeof(sbuf));
+          if (res) {
+            if (dt_vars[cnt]->dp < 0) {
+              // use string
+              strcpy(dt_vars[cnt]->rstr, sbuf);
+            } else {
+              // convert back and forth
+              dtostrfd(CharToFloat(sbuf), dt_vars[cnt]->dp, dt_vars[cnt]->rstr);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void free_dt_vars(void) {
+  for (uint32_t cnt = 0; cnt < MAX_DT_VARS; cnt++) {
+    if (dt_vars[cnt]) {
+      if (dt_vars[cnt]->jstrbuf) free(dt_vars[cnt]->jstrbuf);
+      free(dt_vars[cnt]);
+      dt_vars[cnt] = 0;
+    }
+  }
+}
+
+#endif // USE_DT_VARS
 
 /*********************************************************************************************/
 
@@ -1273,6 +1491,7 @@ void DisplayLocalSensor(void)
 
 #endif  // USE_DISPLAY_MODES1TO5
 
+
 /*********************************************************************************************\
  * Public
 \*********************************************************************************************/
@@ -1288,6 +1507,13 @@ void DisplayInitDriver(void)
     renderer->setDrawMode(0);
   }
 
+#ifdef USE_UFILESYS
+  Display_Text_From_File("/display.ini");
+#endif
+
+#ifdef USE_DT_VARS
+  free_dt_vars();
+#endif
 
 //  AddLog(LOG_LEVEL_DEBUG, PSTR(D_LOG_DEBUG "Display model %d"), Settings.display_model);
 
@@ -1432,12 +1658,23 @@ void CmndDisplayBlinkrate(void)
   ResponseCmndNumber(XdrvMailbox.payload);
 }
 
+#ifdef USE_UFILESYS
+void CmndDisplayBatch(void) {
+  if (XdrvMailbox.data_len > 0) {
+    if (!Settings.display_mode) {
+      Display_Text_From_File(XdrvMailbox.data);
+    }
+    ResponseCmndChar(XdrvMailbox.data);
+  }
+}
+#endif
+
 void CmndDisplaySize(void)
 {
   if ((XdrvMailbox.payload > 0) && (XdrvMailbox.payload <= 4)) {
     Settings.display_size = XdrvMailbox.payload;
     if (renderer) renderer->setTextSize(Settings.display_size);
-    else DisplaySetSize(Settings.display_size);
+    //else DisplaySetSize(Settings.display_size);
   }
   ResponseCmndNumber(Settings.display_size);
 }
@@ -1447,7 +1684,7 @@ void CmndDisplayFont(void)
   if ((XdrvMailbox.payload >=0) && (XdrvMailbox.payload <= 4)) {
     Settings.display_font = XdrvMailbox.payload;
     if (renderer) renderer->setTextFont(Settings.display_font);
-    else DisplaySetFont(Settings.display_font);
+    //else DisplaySetFont(Settings.display_font);
   }
   ResponseCmndNumber(Settings.display_font);
 }
@@ -1575,7 +1812,7 @@ char get_jpeg_size(unsigned char* data, unsigned int data_size, unsigned short *
 #endif // JPEG_PICTS
 #endif // ESP32
 
-#if (defined(USE_SCRIPT_FATFS) && defined(USE_SCRIPT)) || defined(USE_UFILESYS)
+#ifdef USE_UFILESYS
 extern FS *ufsp;
 #define XBUFF_LEN 128
 void Draw_RGB_Bitmap(char *file,uint16_t xp, uint16_t yp, bool inverted ) {
@@ -1675,7 +1912,7 @@ void Draw_RGB_Bitmap(char *file,uint16_t xp, uint16_t yp, bool inverted ) {
 #endif // ESP32
   }
 }
-#endif // USE_SCRIPT_FATFS
+#endif // USE_UFILESYS
 
 #ifdef USE_AWATCH
 #define MINUTE_REDUCT 4
@@ -2003,7 +2240,7 @@ void RedrawGraph(uint8_t num, uint8_t flags) {
   uint16_t linecol=fg_color;
 
   if (color_type==COLOR_COLOR) {
-    linecol=renderer->GetColorFromIndex(gp->color_index);
+    linecol = GetColorFromIndex(gp->color_index);
   }
 
   if (!gp->flags.overlay) {
@@ -2025,7 +2262,7 @@ void AddGraph(uint8_t num,uint8_t val) {
 
   uint16_t linecol=fg_color;
   if (color_type==COLOR_COLOR) {
-    linecol=renderer->GetColorFromIndex(gp->color_index);
+    linecol = GetColorFromIndex(gp->color_index);
   }
   gp->xcnt++;
   if (gp->xcnt>gp->xs) {
@@ -2188,9 +2425,11 @@ uint8_t vbutt=0;
 
       //AddLog(LOG_LEVEL_INFO, PSTR("touch %d - %d"), pLoc.x, pLoc.y);
       // now must compare with defined buttons
-      for (uint8_t count=0; count<MAX_TOUCH_BUTTONS; count++) {
-        if (buttons[count] && !buttons[count]->vpower.disable) {
-            if (buttons[count]->contains(pLoc.x, pLoc.y)) {
+      for (uint8_t count = 0; count < MAX_TOUCH_BUTTONS; count++) {
+        if (buttons[count]) {
+          if (!buttons[count]->vpower.slider) {
+            if (!buttons[count]->vpower.disable) {
+              if (buttons[count]->contains(pLoc.x, pLoc.y)) {
                 // did hit
                 buttons[count]->press(true);
                 if (buttons[count]->justPressed()) {
@@ -2216,12 +2455,20 @@ uint8_t vbutt=0;
                     Touch_MQTT(count, cp, buttons[count]->vpower.on_off);
                   }
                 }
+              }
+              if (!buttons[count]->vpower.is_virtual) {
+                rbutt++;
+              } else {
+                vbutt++;
+              }
             }
-            if (!buttons[count]->vpower.is_virtual) {
-              rbutt++;
-            } else {
-              vbutt++;
+          } else {
+            // slider
+            if (buttons[count]->didhit(pLoc.x, pLoc.y)) {
+              uint16_t value = buttons[count]->UpdateSlider(pLoc.x, pLoc.y);
+              Touch_MQTT(count, "SLD", value);
             }
+          }
         }
       }
     }
@@ -2237,27 +2484,29 @@ uint8_t vbutt=0;
       }
     }
 #endif
-    for (uint8_t count=0; count<MAX_TOUCH_BUTTONS; count++) {
+    for (uint8_t count = 0; count < MAX_TOUCH_BUTTONS; count++) {
       if (buttons[count]) {
-        buttons[count]->press(false);
-        if (buttons[count]->justReleased()) {
-          if (buttons[count]->vpower.is_virtual) {
-            if (buttons[count]->vpower.is_pushbutton) {
-              // push button
-              buttons[count]->vpower.on_off = 0;
-              Touch_MQTT(count,"PBT", buttons[count]->vpower.on_off);
-              buttons[count]->xdrawButton(buttons[count]->vpower.on_off);
+        if (!buttons[count]->vpower.slider) {
+          buttons[count]->press(false);
+          if (buttons[count]->justReleased()) {
+            if (buttons[count]->vpower.is_virtual) {
+              if (buttons[count]->vpower.is_pushbutton) {
+                // push button
+                buttons[count]->vpower.on_off = 0;
+                Touch_MQTT(count,"PBT", buttons[count]->vpower.on_off);
+                buttons[count]->xdrawButton(buttons[count]->vpower.on_off);
+              }
             }
           }
-        }
-        if (!buttons[count]->vpower.is_virtual) {
-          // check if power button stage changed
-          uint8_t pwr = bitRead(TasmotaGlobal.power, rbutt);
-          uint8_t vpwr = buttons[count]->vpower.on_off;
-          if (pwr != vpwr) {
-            Touch_RDW_BUTT(count, pwr);
+          if (!buttons[count]->vpower.is_virtual) {
+            // check if power button stage changed
+            uint8_t pwr = bitRead(TasmotaGlobal.power, rbutt);
+            uint8_t vpwr = buttons[count]->vpower.on_off;
+            if (pwr != vpwr) {
+              Touch_RDW_BUTT(count, pwr);
+            }
+            rbutt++;
           }
-          rbutt++;
         }
       }
     }
@@ -2282,9 +2531,7 @@ bool Xdrv13(uint8_t function)
       case FUNC_PRE_INIT:
         DisplayInitDriver();
 #ifdef USE_GRAPH
-        for (uint8_t count=0;count<NUM_GRAPHS;count++) {
-          graph[count]=0;
-        }
+        for (uint8_t count = 0; count < NUM_GRAPHS; count++) { graph[count] = 0; }
 #endif
         break;
       case FUNC_EVERY_50_MSECOND:
@@ -2297,11 +2544,16 @@ bool Xdrv13(uint8_t function)
 #ifdef USE_GRAPH
         DisplayCheckGraph();
 #endif
+#ifdef USE_DT_VARS
+        get_dt_mqtt();
+        draw_dt_vars();
+#endif // USE_DT_VARS
 
 #ifdef USE_DISPLAY_MODES1TO5
         if (Settings.display_model && Settings.display_mode) { XdspCall(FUNC_DISPLAY_EVERY_SECOND); }
 #endif
         break;
+
 #ifdef USE_DISPLAY_MODES1TO5
       case FUNC_MQTT_SUBSCRIBE:
         DisplayMqttSubscribe();

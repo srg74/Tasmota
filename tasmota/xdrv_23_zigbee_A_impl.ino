@@ -39,7 +39,7 @@ const char kZbCommands[] PROGMEM = D_PRFX_ZB "|"    // prefix
   D_CMND_ZIGBEE_BIND "|" D_CMND_ZIGBEE_UNBIND "|" D_CMND_ZIGBEE_PING "|" D_CMND_ZIGBEE_MODELID "|"
   D_CMND_ZIGBEE_LIGHT "|" D_CMND_ZIGBEE_OCCUPANCY "|"
   D_CMND_ZIGBEE_RESTORE "|" D_CMND_ZIGBEE_BIND_STATE "|" D_CMND_ZIGBEE_MAP "|" D_CMND_ZIGBEE_LEAVE "|"
-  D_CMND_ZIGBEE_CONFIG "|" D_CMND_ZIGBEE_DATA
+  D_CMND_ZIGBEE_CONFIG "|" D_CMND_ZIGBEE_DATA "|" D_CMND_ZIGBEE_SCAN
   ;
 
 SO_SYNONYMS(kZbSynonyms,
@@ -60,7 +60,7 @@ void (* const ZigbeeCommand[])(void) PROGMEM = {
   &CmndZbBind, &CmndZbUnbind, &CmndZbPing, &CmndZbModelId,
   &CmndZbLight, &CmndZbOccupancy,
   &CmndZbRestore, &CmndZbBindState, &CmndZbMap, CmndZbLeave,
-  &CmndZbConfig, CmndZbData,
+  &CmndZbConfig, &CmndZbData, &CmndZbScan,
   };
 
 /********************************************************************************************/
@@ -1311,6 +1311,33 @@ void CmndZbSave(void) {
   ResponseCmndDone();
 }
 
+//
+// Command `ZbScan`
+// Run an energy scan
+//
+void CmndZbScan(void) {
+  if (zigbee.init_phase) { ResponseCmndChar_P(PSTR(D_ZIGBEE_NOT_STARTED)); return; }
+
+  for (uint32_t i = 0; i < USE_ZIGBEE_CHANNEL_COUNT; i++) {
+    zigbee.energy[i] = -0x80;
+  }
+
+#ifdef USE_ZIGBEE_ZNP
+  ResponseCmndChar_P(PSTR("Unsupported command on ZNP"));
+  return;
+ #endif // USE_ZIGBEE_ZNP
+
+#ifdef USE_ZIGBEE_EZSP
+  SBuffer buf(8);
+  buf.add16(EZSP_startScan);
+  buf.add8(0x00);                       // EZSP_ENERGY_SCAN
+  buf.add32(0x07FFF800);                // standard channels 11-26
+  buf.add8(0x04);                       // duration 2 ^ 4
+  ZigbeeEZSPSendCmd(buf.getBuffer(), buf.len());
+
+#endif // USE_ZIGBEE_EZSP
+  ResponseCmndDone();
+}
 
 // Restore a device configuration previously exported via `ZbStatus2``
 // Format:
@@ -1489,8 +1516,8 @@ void ZigbeeGlowPermitJoinLight(void) {
     }
 
     // change the led state
-    uint32_t led_pin = Pin(GPIO_LEDLNK);
-    if (led_pin < 99) {
+    int led_pin = Pin(GPIO_LEDLNK);
+    if (led_pin >= 0) {
       analogWrite(led_pin, TasmotaGlobal.ledlnk_inverted ? 1023 - led_power : led_power);
     }
   }
@@ -1933,9 +1960,9 @@ void ZigbeeShow(bool json)
 
         WSContentSend_PD(msg[ZB_WEB_STATUS_LINE],
         shortaddr,
-        device.modelId ? device.modelId : "",
-        device.manufacturerId ? device.manufacturerId : "",
-        name, sbatt, slqi);
+        device.modelId ? EscapeHTMLString(device.modelId).c_str() : "",
+        device.manufacturerId ? EscapeHTMLString(device.manufacturerId).c_str() : "",
+        EscapeHTMLString(name).c_str(), sbatt, slqi);
 
         if(device.validLqi()) {
             for(uint32_t j = 0; j < 4; ++j) {
