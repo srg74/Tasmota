@@ -433,7 +433,6 @@
 #define D_SO_POWERONFADE "PowerOnFade"      // SO91
 #define D_SO_PWMCT "PWMCT"                  // SO92
 #define D_SO_WHITEBLEND "WhiteBlend"        // SO105
-#define D_SO_VIRTUALCT "VirtualCT"          // SO106
 #define D_CMND_CHANNEL "Channel"
 #define D_CMND_COLOR "Color"
 #define D_CMND_COLORTEMPERATURE "CT"
@@ -662,6 +661,7 @@
 #define D_CMND_SHUTTER_ENABLEENDSTOPTIME "EnableEndStopTime"
 #define D_CMND_SHUTTER_INVERTWEBBUTTONS "InvertWebButtons"
 #define D_CMND_SHUTTER_PWMRANGE "PWMRange"
+#define D_CMND_SHUTTER_UNITTEST "UnitTest"
 
 // Commands xdrv_32_hotplug.ino
 #define D_CMND_HOTPLUG "HotPlug"

@@ -641,6 +641,9 @@
 
 #endif  // USE_SPI
 
+//#define USE_DISPLAY                              // Add Display support
+//  #define USE_DISPLAY_TM1637                     // [DisplayModel 15] Enable TM1637 module
+
 // -- Serial sensors ------------------------------
 //#define USE_MHZ19                                // Add support for MH-Z19 CO2 sensor (+2k code)
 //#define USE_SENSEAIR                             // Add support for SenseAir K30, K70 and S8 CO2 sensor (+2k3 code)
@@ -769,11 +772,13 @@
   #define USE_ZIGBEE_AUTOBIND_PRESSURE      1       // hPA
   #define USE_ZIGBEE_AUTOBIND_ILLUMINANCE   5       // lux
   #define USE_ZIGBEE_AUTOBIND_HUMIDITY      1.0     // %
+  #define USE_ZIGBEE_AUTOBIND_LIFT          1.0     // %
   // Below are the Max Thresholds for reporting time (in seconds)
   #define USE_ZIGBEE_MAXTIME_BATT           4*60*60   // 4h
   #define USE_ZIGBEE_MAXTIME_TRV            60*10     // 10m
   #define USE_ZIGBEE_MAXTIME_SENSOR         60*60     // 1h
   #define USE_ZIGBEE_MAXTIME_LIGHT          60*60     // 1h
+  #define USE_ZIGBEE_MAXTIME_LIFT           4*60*60   // 4h
 
 // -- Other sensors/drivers -----------------------
 

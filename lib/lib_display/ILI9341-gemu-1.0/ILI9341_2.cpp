@@ -136,7 +136,7 @@ static const uint8_t PROGMEM ili9342_initcmd[] = {
   0x00                                   // End of list
 };
 
-ILI9341_2::ILI9341_2(int8_t cs, int8_t mosi, int8_t miso, int8_t sclk, int8_t res, int8_t dc, int8_t bp, int8_t spibus) : Renderer(ILI9341_TFTWIDTH, ILI9341_TFTHEIGHT) {
+ILI9341_2::ILI9341_2(int8_t cs, int8_t mosi, int8_t miso, int8_t sclk, int8_t res, int8_t dc, int8_t bp, int8_t spibus, uint8_t dtype) : Renderer(ILI9341_TFTWIDTH, ILI9341_TFTHEIGHT) {
   _cs   = cs;
   _mosi  = mosi;
   _miso  = miso;
@@ -144,7 +144,7 @@ ILI9341_2::ILI9341_2(int8_t cs, int8_t mosi, int8_t miso, int8_t sclk, int8_t re
   _res = res;
   _dc = dc;
   _bp = bp;
-  _hwspi = 1;  // sign ili9341
+  _hwspi = dtype;  // sign ili9341 or 2
   _spibus = spibus;
 }
 
@@ -175,7 +175,7 @@ void ILI9341_2::writecmd(uint8_t d) {
 void ILI9341_2::init(uint16_t width, uint16_t height) {
   //sspi2 = SPISettings(2500000, MSBFIRST, SPI_MODE3);
 
-  if (_hwspi == 2) {
+  if (_hwspi >= 2) {
     iwidth = ILI9341_TFTWIDTH;
     iheight = ILI9341_TFTHEIGHT;
   } else {
@@ -187,8 +187,13 @@ void ILI9341_2::init(uint16_t width, uint16_t height) {
 
   sspi2 = SPISettings(40000000, MSBFIRST, SPI_MODE0);
 
-  if (_hwspi==2) {
-    spi2=&SPI;
+  if (_hwspi >= 2) {
+    spi2 = &SPI;
+#ifdef ESP32
+    if (_hwspi > 2) {
+      spi2->begin(_sclk, _miso, _mosi, -1);
+    }
+#endif // ESP32
   } else {
 #ifdef ESP32
     if (_spibus == 2) {
@@ -522,7 +527,7 @@ void ili9342_bpwr(uint8_t on);
 
 void ILI9341_2::DisplayOnff(int8_t on) {
 
-  if (_hwspi==2) {
+  if (_hwspi>=2) {
     ili9342_bpwr(on);
   }
 
@@ -572,7 +577,7 @@ void ILI9341_2::dim(uint8_t dim) {
   if (_bp>=0) {
     ledcWrite(ESP32_PWM_CHANNEL,dimmer);
   } else {
-    if (_hwspi==2) {
+    if (_hwspi>=2) {
       ili9342_dimm(dim);
     }
   }
