@@ -35,7 +35,7 @@ static unsigned long oswatch_last_loop_time;
 uint8_t oswatch_blocked_loop = 0;
 
 #ifndef USE_WS2812_DMA  // Collides with Neopixelbus but solves exception
-//void OsWatchTicker() ICACHE_RAM_ATTR;
+//void OsWatchTicker() IRAM_ATTR;
 #endif  // USE_WS2812_DMA
 
 #ifdef USE_KNX
@@ -513,6 +513,14 @@ char* UpperCase_P(char* dest, const char* source)
     *write++ = toupper(ch);
   }
   return dest;
+}
+
+char* StrCaseStr_P(const char* source, const char* search) {
+  char case_source[strlen_P(source) +1];
+  UpperCase_P(case_source, source);
+  char case_search[strlen_P(search) +1];
+  UpperCase_P(case_search, search);
+  return strstr(case_source, case_search);
 }
 
 char* Trim(char* p)
@@ -1295,7 +1303,7 @@ void DumpConvertTable(void) {
     jsflg = true;
     if ((ResponseAppend_P(PSTR("\"%d\":\"%d\""), i, data) > (MAX_LOGSZ - TOPSZ)) || (i == nitems(kGpioConvert) -1)) {
       ResponseJsonEndEnd();
-      MqttPublishPrefixTopic_P(RESULT_OR_STAT, XdrvMailbox.command);
+      MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_STAT, XdrvMailbox.command);
       jsflg = false;
       lines++;
     }
@@ -1310,7 +1318,7 @@ void DumpConvertTable(void) {
     jsflg = true;
     if ((ResponseAppend_P(PSTR("\"%d\":\"%d\""), i, data) > (MAX_LOGSZ - TOPSZ)) || (i == nitems(kAdcNiceList) -1)) {
       ResponseJsonEndEnd();
-      MqttPublishPrefixTopic_P(RESULT_OR_STAT, XdrvMailbox.command);
+      MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_STAT, XdrvMailbox.command);
       jsflg = false;
       lines++;
     }
@@ -1320,8 +1328,8 @@ void DumpConvertTable(void) {
 */
 #endif  // ESP8266
 
-int ICACHE_RAM_ATTR Pin(uint32_t gpio, uint32_t index = 0);
-int ICACHE_RAM_ATTR Pin(uint32_t gpio, uint32_t index) {
+int IRAM_ATTR Pin(uint32_t gpio, uint32_t index = 0);
+int IRAM_ATTR Pin(uint32_t gpio, uint32_t index) {
   uint16_t real_gpio = gpio << 5;
   uint16_t mask = 0xFFE0;
   if (index < GPIO_ANY) {
@@ -1395,6 +1403,7 @@ bool ValidModule(uint32_t index)
 }
 
 bool ValidTemplate(const char *search) {
+/*
   char template_name[strlen(SettingsText(SET_TEMPLATE_NAME)) +1];
   char search_name[strlen(search) +1];
 
@@ -1402,6 +1411,8 @@ bool ValidTemplate(const char *search) {
   LowerCase(search_name, search);
 
   return (strstr(template_name, search_name) != nullptr);
+*/
+  return (StrCaseStr_P(SettingsText(SET_TEMPLATE_NAME), search) != nullptr);
 }
 
 String AnyModuleName(uint32_t index)
@@ -1643,6 +1654,23 @@ bool JsonTemplate(char* dataBuf)
     uint32_t base = val.getUInt();
     if ((0 == base) || !ValidTemplateModule(base -1)) { base = 18; }
     Settings.user_template_base = base -1;  // Default WEMOS
+  }
+
+  val = root[PSTR(D_JSON_CMND)];
+  if (val) {
+    if ((USER_MODULE == Settings.module) || (StrCaseStr_P(val.getStr(), PSTR(D_CMND_MODULE " 0")))) {  // Only execute if current module = USER_MODULE = this template
+      char* backup_data = XdrvMailbox.data;
+      XdrvMailbox.data = (char*)val.getStr();   // Backlog commands
+      ReplaceChar(XdrvMailbox.data, '|', ';');  // Support '|' as command separator for JSON backwards compatibility
+      uint32_t backup_data_len = XdrvMailbox.data_len;
+      XdrvMailbox.data_len = 1;                 // Any data
+      uint32_t backup_index = XdrvMailbox.index;
+      XdrvMailbox.index = 0;                    // Backlog0 - no delay
+      CmndBacklog();
+      XdrvMailbox.index = backup_index;
+      XdrvMailbox.data_len = backup_data_len;
+      XdrvMailbox.data = backup_data;
+    }
   }
 
 //  AddLog(LOG_LEVEL_DEBUG, PSTR("TPL: Converted"));

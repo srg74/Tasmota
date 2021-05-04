@@ -67,6 +67,7 @@ m = minimal, l = lite, t = tasmota, k = knx, s = sensors, i = ir, d = display
 | USE_ELECTRIQ_MOODL    | - | - | x / - | x | x | - | x |
 |                       |   |   |       |   |   |   |   |
 | USE_ENERGY_SENSOR     | - | x | x / x | x | x | - | - |
+| USE_ENERGY_DUMMY      | - | x | x / x | x | x | - | - |
 | USE_PZEM004T          | - | - | x / x | x | x | - | - |
 | USE_PZEM_AC           | - | - | x / x | x | x | - | - |
 | USE_PZEM_DC           | - | - | x / x | x | x | - | - |
@@ -104,7 +105,7 @@ m = minimal, l = lite, t = tasmota, k = knx, s = sensors, i = ir, d = display
 | USE_INA219            | - | - | - / x | - | x | - | - |
 | USE_INA226            | - | - | - / - | - | - | - | - |
 | USE_SHT3X             | - | - | - / x | - | x | - | - |
-| USE_TSL2561           | - | - | - / x | - | x | - | - |
+| USE_TSL2561           | - | - | - / - | - | - | - | - |
 | USE_TSL2591           | - | - | - / - | - | - | - | - |
 | USE_MGS               | - | - | - / x | - | x | - | - |
 | USE_SGP30             | - | - | - / x | - | x | - | - |
@@ -123,7 +124,7 @@ m = minimal, l = lite, t = tasmota, k = knx, s = sensors, i = ir, d = display
 | USE_SCD30             | - | - | - / x | - | x | - | - |
 | USE_SPS30             | - | - | - / - | - | - | - | - |
 | USE_ADE7953           | - | - | x / x | x | x | - | x |
-| USE_VL53L0X           | - | - | - / - | - | - | - | - |
+| USE_VL53L0X           | - | - | - / x | - | x | - | - |
 | USE_MLX90614          | - | - | - / - | - | - | - | - |
 | USE_CHIRP             | - | - | - / - | - | - | - | - |
 | USE_PAJ7620           | - | - | - / - | - | - | - | - |

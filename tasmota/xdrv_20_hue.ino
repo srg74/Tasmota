@@ -172,8 +172,7 @@ const char HUE_API[] PROGMEM = "\x00\x06\x3B\x37\x8C\xEC\x2D\x10\xEC\x9C\x2F\x9D
 
 String HueBridgeId(void)
 {
-  String temp = WiFi.macAddress();
-  temp.replace(":", "");
+  String temp = NetworkUniqueId();
   String bridgeid = temp.substring(0, 6);
   bridgeid += F("FFFE");
   bridgeid += temp.substring(6);
@@ -182,8 +181,7 @@ String HueBridgeId(void)
 
 String HueSerialnumber(void)
 {
-  String serial = WiFi.macAddress();
-  serial.replace(":", "");
+  String serial = NetworkUniqueId();
   serial.toLowerCase();
   return serial;  // 5ccf7f139f3d
 }
@@ -202,21 +200,24 @@ void HueRespondToMSearch(void)
   if (PortUdp.beginPacket(udp_remote_ip, udp_remote_port)) {
     UnishoxStrings msg(HUE_RESP_MSG);
     char response[320];
-    snprintf_P(response, sizeof(response), msg[HUE_RESP_RESPONSE], WiFi.localIP().toString().c_str(), HueBridgeId().c_str());
+    snprintf_P(response, sizeof(response), msg[HUE_RESP_RESPONSE], NetworkAddress().toString().c_str(), HueBridgeId().c_str());
     int len = strlen(response);
     String uuid = HueUuid();
 
     snprintf_P(response + len, sizeof(response) - len, msg[HUE_RESP_ST1], uuid.c_str());
     PortUdp.write(response);
     PortUdp.endPacket();
+    // AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_UPNP "UDP resp=%s"), response);
 
     snprintf_P(response + len, sizeof(response) - len, msg[HUE_RESP_ST2], uuid.c_str(), uuid.c_str());
     PortUdp.write(response);
     PortUdp.endPacket();
+    // AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_UPNP "UDP resp=%s"), response);
 
     snprintf_P(response + len, sizeof(response) - len, msg[HUE_RESP_ST3], uuid.c_str());
     PortUdp.write(response);
     PortUdp.endPacket();
+    // AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_UPNP "UDP resp=%s"), response);
 
     snprintf_P(message, sizeof(message), PSTR(D_3_RESPONSE_PACKETS_SENT));
   } else {
@@ -409,12 +410,11 @@ const char HueConfigResponse_JSON[] PROGMEM = "\x3D\xA7\xB3\xAC\x6B\x3D\x87\x99\
 
 String GetHueDeviceId(uint16_t id)
 {
+  char s[32];
   String deviceid = WiFi.macAddress();
-  deviceid += F(":00:11-");
-  if(id<0x10) deviceid += F("0");
-  deviceid += String(id,HEX);
   deviceid.toLowerCase();
-  return deviceid;  // 5c:cf:7f:13:9f:3d:00:11-01
+  snprintf(s, sizeof(s), "%s:%02x:11-%02x", deviceid.c_str(), (id >> 8) & 0xFF, id & 0xFF);
+  return String(s);  // 5c:cf:7f:13:9f:3d:00:11-01
 }
 
 String GetHueUserId(void)
@@ -727,7 +727,12 @@ void HueLightsCommand(uint8_t device, uint32_t device_id, String &response) {
   if (Webserver->args()) {
     response = "[";
 
+#ifdef ESP82666   // ESP8266 memory is limited, avoid copying and modify in place
     JsonParser parser((char*) Webserver->arg((Webserver->args())-1).c_str());
+#else             // does not work on ESP32, we need to get a fresh copy of the string
+    String request_arg = Webserver->arg((Webserver->args())-1);
+    JsonParser parser((char*) request_arg.c_str());
+#endif
     JsonParserObject root = parser.getRootObject();
 
     JsonParserToken hue_on = root[PSTR("on")];
@@ -890,11 +895,10 @@ void HueLightsCommand(uint8_t device, uint32_t device_id, String &response) {
           LightSetBri(device, bri);
         }
         if (LST_COLDWARM <= local_light_subtype) {
-          MqttPublishPrefixTopic_P(RESULT_OR_STAT, PSTR(D_CMND_COLOR));
+          MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_STAT, PSTR(D_CMND_COLOR));
         } else {
-          MqttPublishPrefixTopic_P(RESULT_OR_STAT, PSTR(D_CMND_DIMMER));
+          MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_STAT, PSTR(D_CMND_DIMMER));
         }
-        XdrvRulesProcess();
       }
       change = false;
     }
@@ -996,7 +1000,7 @@ void HueLights(String *path)
     code = 406;
   }
   exit:
-  AddLog(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_HTTP D_HUE " Result (%s)"), response.c_str());
+  AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR(D_LOG_HTTP D_HUE " Result (%s)"), response.c_str());
   WSSend(code, CT_APP_JSON, response);
 }
 

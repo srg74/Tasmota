@@ -785,8 +785,7 @@ int32_t Z_ReceiveSimpleDesc(int32_t res, const SBuffer &buf) {
       ResponseAppend_P(PSTR("\"0x%04X\""), buf.get16(numOutIndex + i*2));
     }
     ResponseAppend_P(PSTR("]}}"));
-    MqttPublishPrefixTopic_P(RESULT_OR_TELE, PSTR(D_JSON_ZIGBEEZCL_RECEIVED));
-    XdrvRulesProcess();
+    MqttPublishPrefixTopicRulesProcess_P(RESULT_OR_TELE, PSTR(D_JSON_ZIGBEEZCL_RECEIVED));
   }
 
   // If tuya protocol, change the model information
@@ -2018,15 +2017,15 @@ int32_t ZNP_Recv_Default(int32_t res, const SBuffer &buf) {
 //
 // Callback for loading preparing EEPROM, called by the state machine
 //
-#ifdef USE_ZIGBEE_EZSP
-int32_t Z_Prepare_EEPROM(uint8_t value) {
+int32_t Z_Prepare_Storage(uint8_t value) {
+#ifdef USE_ZIGBEE_EEPROM
   ZFS::initOrFormat();
+#endif
   return 0;                              // continue
 }
-#endif // USE_ZIGBEE_EZSP
 
 //
-// Callback for loading Zigbee configuration from Flash, called by the state machine
+// Callback for loading Zigbee configuration, called by the state machine
 //
 int32_t Z_Load_Devices(uint8_t value) {
   // try to hidrate from known devices
@@ -2037,8 +2036,8 @@ int32_t Z_Load_Devices(uint8_t value) {
 //
 // Callback for loading Zigbee data from EEPROM, called by the state machine
 //
-int32_t Z_Load_Data_EEPROM(uint8_t value) {
-  hydrateDevicesDataFromEEPROM();
+int32_t Z_Load_Data(uint8_t value) {
+  hydrateDevicesData();
   return 0;                              // continue
 }
 

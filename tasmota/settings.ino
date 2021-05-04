@@ -706,11 +706,12 @@ void SettingsDefaultSet2(void) {
   memset((char*)&Settings +16, 0x00, sizeof(Settings) -16);
 
   // this little trick allows GCC to optimize the assignment by grouping values and doing only ORs
-  SysBitfield   flag = { 0 };
-  SysBitfield2  flag2 = { 0 };
-  SysBitfield3  flag3 = { 0 };
-  SysBitfield4  flag4 = { 0 };
-  SysBitfield5  flag5 = { 0 };
+  SOBitfield   flag = { 0 };
+  SOBitfield3  flag3 = { 0 };
+  SOBitfield4  flag4 = { 0 };
+  SOBitfield5  flag5 = { 0 };
+  SysMBitfield1  flag2 = { 0 };
+  SysMBitfield2  mbflag2 = { 0 };
 
 #ifdef ESP8266
   Settings.gpio16_converted = 0xF5A0;
@@ -750,7 +751,11 @@ void SettingsDefaultSet2(void) {
   SettingsUpdateText(SET_FRIENDLYNAME2, PSTR(FRIENDLY_NAME"2"));
   SettingsUpdateText(SET_FRIENDLYNAME3, PSTR(FRIENDLY_NAME"3"));
   SettingsUpdateText(SET_FRIENDLYNAME4, PSTR(FRIENDLY_NAME"4"));
+  #ifdef DEVICE_NAME
+  SettingsUpdateText(SET_DEVICENAME, PSTR(DEVICE_NAME));
+  #else
   SettingsUpdateText(SET_DEVICENAME, SettingsText(SET_FRIENDLYNAME1));
+  #endif
   SettingsUpdateText(SET_OTAURL, PSTR(OTA_URL));
 
   // Power
@@ -1060,6 +1065,7 @@ void SettingsDefaultSet2(void) {
   // Tuya
   flag3.tuya_apply_o20 |= TUYA_SETOPTION_20;
   flag3.tuya_serial_mqtt_publish |= MQTT_TUYA_RECEIVED;
+  mbflag2.temperature_set_res |= TUYA_TEMP_SET_RES;
 
   flag3.buzzer_enable |= BUZZER_ENABLE;
   flag3.shutter_mode |= SHUTTER_SUPPORT;
@@ -1071,16 +1077,47 @@ void SettingsDefaultSet2(void) {
   flag4.mqtt_tls |= MQTT_TLS_ENABLED;
   flag4.mqtt_no_retain |= MQTT_NO_RETAIN;
 
-#ifdef USER_TEMPLATE
-  String user_template = USER_TEMPLATE;
-  JsonTemplate((char*)user_template.c_str());
-#endif
-
   Settings.flag = flag;
   Settings.flag2 = flag2;
   Settings.flag3 = flag3;
   Settings.flag4 = flag4;
   Settings.flag5 = flag5;
+
+#ifdef USER_TEMPLATE
+  String user_template = USER_TEMPLATE;
+  JsonTemplate((char*)user_template.c_str());
+  user_template = (const char*) nullptr;  // Force deallocation of the String internal memory
+#endif
+
+#ifdef USE_RULES
+#ifdef USER_RULE1
+  String user_rule1 = F("Rule1 ");
+  user_rule1 += USER_RULE1;
+  ExecuteCommand((char*)user_rule1.c_str(), SRC_RESTART);
+  user_rule1 = (const char*) nullptr;     // Force deallocation of the String internal memory
+#endif
+
+#ifdef USER_RULE2
+  String user_rule2 = F("Rule2 ");
+  user_rule2 += USER_RULE2;
+  ExecuteCommand((char*)user_rule2.c_str(), SRC_RESTART);
+  user_rule2 = (const char*) nullptr;     // Force deallocation of the String internal memory
+#endif
+
+#ifdef USER_RULE3
+  String user_rule3 = F("Rule3 ");
+  user_rule3 += USER_RULE3;
+  ExecuteCommand((char*)user_rule3.c_str(), SRC_RESTART);
+  user_rule3 = (const char*) nullptr;     // Force deallocation of the String internal memory
+#endif
+#endif  // USE_RULES
+
+#ifdef USER_BACKLOG
+  String user_backlog = F("Backlog0 ");
+  user_backlog += USER_BACKLOG;
+  ExecuteCommand((char*)user_backlog.c_str(), SRC_RESTART);
+  user_backlog = (const char*) nullptr;   // Force deallocation of the String internal memory
+#endif
 }
 
 /********************************************************************************************/
@@ -1225,7 +1262,7 @@ void SettingsDelta(void) {
     if (Settings.version < 0x09000002) {
       char parameters[32];
       snprintf_P(parameters, sizeof(parameters), PSTR("%d,%d,%d,%d,%d"),
-        Settings.ex_adc_param_type, Settings.ex_adc_param1, Settings.ex_adc_param2, Settings.ex_adc_param3, Settings.ex_adc_param4);
+        Settings.ex_adc_param_type, Settings.ex_adc_param1, Settings.ex_adc_param2, Settings.ex_adc_param3, Settings.mbflag2.data);
       SettingsUpdateText(SET_ADC_PARAM1, parameters);
     }
 #endif  // ESP8266
@@ -1249,6 +1286,12 @@ void SettingsDelta(void) {
     if (Settings.version < 0x09030102) {
       Settings.mqtt_keepalive = MQTT_KEEPALIVE;
       Settings.mqtt_socket_timeout = MQTT_SOCKET_TIMEOUT;
+    }
+    if (Settings.version < 0x09030104) {
+      Settings.mbflag2.data = 0;
+    }
+    if (Settings.version < 0x09040002) {
+      Settings.sbflag1.data = 0;
     }
 
     Settings.version = VERSION;
