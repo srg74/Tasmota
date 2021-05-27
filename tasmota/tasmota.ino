@@ -188,7 +188,7 @@ struct {
   uint8_t module_type;                      // Current copy of Settings.module or user template type
   uint8_t last_source;                      // Last command source
   uint8_t shutters_present;                 // Number of actual define shutters
-//  uint8_t prepped_loglevel;                 // Delayed log level message
+  uint8_t discovery_counter;                // Delayed discovery counter
 
 #ifndef SUPPORT_IF_STATEMENT
   uint8_t backlog_index;                    // Command backlog index
@@ -342,6 +342,8 @@ void setup(void) {
     }
   }
 
+  memcpy_P(TasmotaGlobal.version, VERSION_MARKER, 1);  // Dummy for compiler saving VERSION_MARKER
+
   snprintf_P(TasmotaGlobal.version, sizeof(TasmotaGlobal.version), PSTR("%d.%d.%d"), VERSION >> 24 & 0xff, VERSION >> 16 & 0xff, VERSION >> 8 & 0xff);  // Release version 6.3.0
   if (VERSION & 0xff) {  // Development or patched version 6.3.0.10
     snprintf_P(TasmotaGlobal.version, sizeof(TasmotaGlobal.version), PSTR("%s.%d"), TasmotaGlobal.version, VERSION & 0xff);
@@ -365,6 +367,9 @@ void setup(void) {
 #ifdef ROTARY_V1
   RotaryInit();
 #endif  // ROTARY_V1
+#ifdef USE_BERRY
+  BerryInit();
+#endif // USE_BERRY
 
   XdrvCall(FUNC_PRE_INIT);
   XsnsCall(FUNC_PRE_INIT);
@@ -377,8 +382,6 @@ void setup(void) {
 #ifdef FIRMWARE_MINIMAL
   AddLog(LOG_LEVEL_INFO, PSTR(D_WARNING_MINIMAL_VERSION));
 #endif  // FIRMWARE_MINIMAL
-
-  memcpy_P(TasmotaGlobal.mqtt_data, VERSION_MARKER, 1);  // Dummy for compiler saving VERSION_MARKER
 
 #ifdef USE_ARDUINO_OTA
   ArduinoOTAInit();

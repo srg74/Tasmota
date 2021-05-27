@@ -2424,9 +2424,9 @@ chknext:
                 }
               } else {
                 // preserve mqtt_data
-                char *mqd = (char*)malloc(MESSZ+2);
+                char *mqd = (char*)malloc(ResponseSize()+2);
                 if (mqd) {
-                  strlcpy(mqd, TasmotaGlobal.mqtt_data, MESSZ);
+                  strlcpy(mqd, TasmotaGlobal.mqtt_data, ResponseSize());
                   wd = mqd;
                   char *lwd = wd;
                   while (index) {
@@ -2616,13 +2616,21 @@ chknext:
           len = 0;
           goto exit;
         }
-        if (!strncmp(vname, "iw(", 3)) {
-          lp = GetNumericArgument(lp + 3, OPER_EQU, &fvar, gv);
+        if (!strncmp(vname, "iw", 2)) {
+          uint8_t bytes = 1;
+          lp += 2;
+          if (*lp != '(') {
+            bytes = *lp & 0xf;
+            if (bytes < 1) bytes = 1;
+            if (bytes > 4) bytes = 4;
+            lp++;
+          }
+          lp = GetNumericArgument(lp + 1, OPER_EQU, &fvar, gv);
           SCRIPT_SKIP_SPACES
           // arg2
           float fvar2;
           lp = GetNumericArgument(lp, OPER_EQU, &fvar2, gv);
-          fvar = script_i2c(1, fvar, fvar2);
+          fvar = script_i2c(9 + bytes, fvar, fvar2);
           lp++;
           len = 0;
           goto exit;
@@ -4971,9 +4979,9 @@ void ScripterEvery100ms(void) {
     TasmotaGlobal.tele_period = 2;
     XsnsNextCall(FUNC_JSON_APPEND, xsns_index);
     TasmotaGlobal.tele_period = script_tele_period_save;
-    if (strlen(TasmotaGlobal.mqtt_data)) {
-      TasmotaGlobal.mqtt_data[0] = '{';
-      snprintf_P(TasmotaGlobal.mqtt_data, sizeof(TasmotaGlobal.mqtt_data), PSTR("%s}"), TasmotaGlobal.mqtt_data);
+    if (ResponseLength()) {
+      ResponseJsonStart();
+      ResponseJsonEnd();
       Run_Scripter(">T", 2, TasmotaGlobal.mqtt_data);
     }
   }
@@ -6032,7 +6040,7 @@ bool ScriptCommand(void) {
     } else {
       if ('>' == XdrvMailbox.data[0]) {
         // execute script
-        snprintf_P (TasmotaGlobal.mqtt_data, sizeof(TasmotaGlobal.mqtt_data), PSTR("{\"%s\":\"%s\"}"), command,XdrvMailbox.data);
+        Response_P(PSTR("{\"%s\":\"%s\"}"), command, XdrvMailbox.data);
         if (bitRead(Settings.rule_enabled, 0)) {
           for (uint8_t count = 0; count<XdrvMailbox.data_len; count++) {
             if (XdrvMailbox.data[count]==';') XdrvMailbox.data[count] = '\n';
@@ -6051,15 +6059,15 @@ bool ScriptCommand(void) {
         if (glob_script_mem.glob_error==1) {
           // was string, not number
           GetStringArgument(lp, OPER_EQU, str, 0);
-          snprintf_P (TasmotaGlobal.mqtt_data, sizeof(TasmotaGlobal.mqtt_data), PSTR("{\"script\":{\"%s\":\"%s\"}}"), lp, str);
+          Response_P(PSTR("{\"script\":{\"%s\":\"%s\"}}"), lp, str);
         } else {
           dtostrfd(fvar, 6, str);
-          snprintf_P (TasmotaGlobal.mqtt_data, sizeof(TasmotaGlobal.mqtt_data), PSTR("{\"script\":{\"%s\":%s}}"), lp, str);
+          Response_P(PSTR("{\"script\":{\"%s\":%s}}"), lp, str);
         }
       }
       return serviced;
     }
-    snprintf_P (TasmotaGlobal.mqtt_data, sizeof(TasmotaGlobal.mqtt_data), PSTR("{\"%s\":\"%s\",\"Free\":%d}"),command, GetStateText(bitRead(Settings.rule_enabled, 0)), glob_script_mem.script_size - strlen(glob_script_mem.script_ram));
+    Response_P(PSTR("{\"%s\":\"%s\",\"Free\":%d}"), command, GetStateText(bitRead(Settings.rule_enabled, 0)), glob_script_mem.script_size - strlen(glob_script_mem.script_ram));
 #ifdef SUPPORT_MQTT_EVENT
   } else if (CMND_SUBSCRIBE == command_code) {			//MQTT Subscribe command. Subscribe <Event>, <Topic> [, <Key>]
       String result = ScriptSubscribe(XdrvMailbox.data, XdrvMailbox.data_len);
@@ -7695,7 +7703,7 @@ int32_t http_req(char *host, char *request) {
   }
 
 #ifdef USE_WEBSEND_RESPONSE
-  strlcpy(TasmotaGlobal.mqtt_data, http.getString().c_str(), MESSZ);
+  strlcpy(TasmotaGlobal.mqtt_data, http.getString().c_str(), ResponseSize());
   //AddLog(LOG_LEVEL_INFO, PSTR("HTTP RESULT %s"), TasmotaGlobal.mqtt_data);
   Run_Scripter(">E", 2, TasmotaGlobal.mqtt_data);
   glob_script_mem.glob_error = 0;
@@ -7830,7 +7838,10 @@ void cpy2lf(char *dst, uint32_t dstlen, char *src) {
 #ifdef USE_SCRIPT_I2C
 uint8_t script_i2c_addr;
 TwoWire *script_i2c_wire;
-uint32_t script_i2c(uint8_t sel, uint8_t val, uint8_t val1) {
+uint32_t script_i2c(uint8_t sel, uint32_t val, uint32_t val1) {
+  uint32_t rval = 0;
+  uint8_t bytes = 1;
+
   switch (sel) {
     case 0:
       script_i2c_addr = val;
@@ -7843,26 +7854,36 @@ uint32_t script_i2c(uint8_t sel, uint8_t val, uint8_t val1) {
       script_i2c_wire->beginTransmission(script_i2c_addr);
       return (0 == script_i2c_wire->endTransmission());
       break;
-    case 1:
-      script_i2c_wire->beginTransmission(script_i2c_addr);
-      script_i2c_wire->write(val);
-      script_i2c_wire->write(val1);
-      script_i2c_wire->endTransmission();
-      break;
     case 2:
+      // read 1..4 bytes
       script_i2c_wire->beginTransmission(script_i2c_addr);
       script_i2c_wire->write(val);
       script_i2c_wire->endTransmission();
       script_i2c_wire->requestFrom((int)script_i2c_addr, (int)val1);
-      uint32_t rval = 0;
+
       for (uint8_t cnt = 0; cnt < val1; cnt++) {
         rval <<= 8;
         rval |= script_i2c_wire->read();
       }
-      return rval;
       break;
+
+    case 10:
+    case 11:
+    case 12:
+    case 13:
+      // write 1 .. 4 bytes
+      bytes = sel - 9;
+      script_i2c_wire->beginTransmission(script_i2c_addr);
+      script_i2c_wire->write(val);
+      for (uint8_t cnt = 0; cnt < bytes; cnt++) {
+        script_i2c_wire->write(val1);
+        val1 >>= 8;
+      }
+      script_i2c_wire->endTransmission();
+      break;
+
   }
-  return 0;
+  return rval;
 }
 #endif // USE_SCRIPT_I2C
 
@@ -8365,11 +8386,6 @@ bool Xdrv10(uint8_t function)
     case FUNC_EVERY_100_MSECOND:
       ScripterEvery100ms();
       break;
-#ifdef USE_LVGL
-    case FUNC_EVERY_50_MSECOND:
-      lv_task_handler();
-      break;
-#endif // USE_LVGL
 
     case FUNC_EVERY_SECOND:
       ScriptEverySecond();
@@ -8389,7 +8405,15 @@ bool Xdrv10(uint8_t function)
       break;
     case FUNC_RULES_PROCESS:
       if (bitRead(Settings.rule_enabled, 0)) {
+#ifdef USE_SCRIPT_STATUS
+        if (!strncmp_P(TasmotaGlobal.mqtt_data, PSTR("{\"Status"), 8)) {
+          Run_Scripter(">U", 2, TasmotaGlobal.mqtt_data);
+        } else {
+          Run_Scripter(">E", 2, TasmotaGlobal.mqtt_data);
+        }
+#else
         Run_Scripter(">E", 2, TasmotaGlobal.mqtt_data);
+#endif
         result = glob_script_mem.event_handeled;
       }
       break;

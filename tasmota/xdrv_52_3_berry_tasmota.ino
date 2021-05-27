@@ -60,7 +60,7 @@ extern "C" {
         if (top == 4) {
           retain = be_tobool(vm, 4);
         }
-        strlcpy(TasmotaGlobal.mqtt_data, payload, sizeof(TasmotaGlobal.mqtt_data));
+        Response_P(payload);
         MqttPublish(topic, retain);
         be_return(vm); // Return
       }
@@ -268,6 +268,18 @@ extern "C" {
   }
 
   // web append with decimal conversion
+  int32_t l_webSend(bvm *vm);
+  int32_t l_webSend(bvm *vm) {
+    int32_t top = be_top(vm); // Get the number of arguments
+    if (top == 2 && be_isstring(vm, 2)) {
+      const char *msg = be_tostring(vm, 2);
+      WSContentSend_P(PSTR("%s"), msg);
+      be_return_nil(vm); // Return nil when something goes wrong
+    }
+    be_raise(vm, kTypeError, nullptr);
+  }
+
+  // web append with decimal conversion
   int32_t l_webSendDecimal(bvm *vm);
   int32_t l_webSendDecimal(bvm *vm) {
     int32_t top = be_top(vm); // Get the number of arguments
@@ -394,6 +406,33 @@ void berry_log(const char * berry_buf) {
   // AddLog(LOG_LEVEL_INFO, PSTR("[Add to log] %s"), berry_buf);
   berry.log.addString(berry_buf, pre_delimiter, "\n");
   AddLog_P(LOG_LEVEL_INFO, PSTR("%s"), berry_buf);
+}
+
+extern "C" {
+  void berry_log_C(const char * berry_buf, ...) {
+    // To save stack space support logging for max text length of 128 characters
+    char log_data[LOGSZ];
+
+    va_list arg;
+    va_start(arg, berry_buf);
+    uint32_t len = ext_vsnprintf_P(log_data, LOGSZ-3, berry_buf, arg);
+    va_end(arg);
+    if (len+3 > LOGSZ) { strcat(log_data, "..."); }  // Actual data is more
+    berry_log(log_data);
+  }
+}
+
+
+void berry_log_P(const char * berry_buf, ...) {
+  // To save stack space support logging for max text length of 128 characters
+  char log_data[LOGSZ];
+
+  va_list arg;
+  va_start(arg, berry_buf);
+  uint32_t len = ext_vsnprintf_P(log_data, LOGSZ-3, berry_buf, arg);
+  va_end(arg);
+  if (len+3 > LOGSZ) { strcat(log_data, "..."); }  // Actual data is more
+  berry_log(log_data);
 }
 
 
