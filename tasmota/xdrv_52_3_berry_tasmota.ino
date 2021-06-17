@@ -97,7 +97,11 @@ extern "C" {
       const char * command = be_tostring(vm, 2);
       be_pop(vm, 2);    // clear the stack before calling, because of re-entrant call to Berry in a Rule
       ExecuteCommand(command, SRC_BERRY);
+#ifdef MQTT_DATA_STRING
+      be_pushstring(vm, TasmotaGlobal.mqtt_data.c_str());
+#else
       be_pushstring(vm, TasmotaGlobal.mqtt_data);
+#endif
       be_return(vm); // Return
     }
     be_raise(vm, kTypeError, nullptr);
@@ -158,6 +162,29 @@ extern "C" {
       map_insert_int(vm, "local", Rtc.local_time);
       map_insert_int(vm, "restart", Rtc.restart_time);
       map_insert_int(vm, "timezone", Rtc.time_timezone);
+      be_pop(vm, 1);
+      be_return(vm);
+    }
+    be_raise(vm, kTypeError, nullptr);
+  }
+
+  // Berry: tasmota.memory(timer:int) -> bool
+  //
+  int32_t l_memory(struct bvm *vm);
+  int32_t l_memory(struct bvm *vm) {
+    int32_t top = be_top(vm); // Get the number of arguments
+    if (top == 1) {  // no argument (instance only)
+      be_newobject(vm, "map");
+      map_insert_int(vm, "flash", ESP.getFlashChipSize() / 1024);
+      map_insert_int(vm, "program", ESP_getSketchSize() / 1024);
+      map_insert_int(vm, "program_free", ESP.getFreeSketchSpace() / 1024);
+      map_insert_int(vm, "heap_free", ESP_getFreeHeap() / 1024);
+      int32_t freeMaxMem = 100 - (int32_t)(ESP_getMaxAllocHeap() * 100 / ESP_getFreeHeap());
+      map_insert_int(vm, "frag", freeMaxMem);
+      if (psramFound()) {
+        map_insert_int(vm, "psram", ESP.getPsramSize() / 1024);
+        map_insert_int(vm, "psram_free", ESP.getFreePsram() / 1024);
+      }
       be_pop(vm, 1);
       be_return(vm);
     }
@@ -382,7 +409,7 @@ extern "C" {
         log_level = be_toint(vm, 3);
         if (log_level > LOG_LEVEL_DEBUG_MORE) { log_level = LOG_LEVEL_DEBUG_MORE; }
       }
-      AddLog_P(log_level, PSTR("%s"), msg);
+      AddLog(log_level, PSTR("%s"), msg);
       be_return(vm); // Return
     }
     be_return_nil(vm); // Return nil when something goes wrong
@@ -425,8 +452,10 @@ void berry_log(const char * berry_buf) {
   }
   // AddLog(LOG_LEVEL_INFO, PSTR("[Add to log] %s"), berry_buf);
   berry.log.addString(berry_buf, pre_delimiter, "\n");
-  AddLog_P(LOG_LEVEL_INFO, PSTR("%s"), berry_buf);
+  AddLog(LOG_LEVEL_INFO, PSTR("%s"), berry_buf);
 }
+
+const uint16_t LOGSZ = 128;                 // Max number of characters in log line
 
 extern "C" {
   void berry_log_C(const char * berry_buf, ...) {

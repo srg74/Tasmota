@@ -779,6 +779,11 @@ newframe: /* a new call frame */
                 int type = obj_attribute(vm, b, c, a);
                 reg = vm->reg;
                 if (basetype(type) == BE_FUNCTION) {
+                    /* check if the object is a superinstance, if so get the lowest possible subclass */
+                    while (obj->sub) {
+                        obj = obj->sub;
+                    }
+                    var_setobj(&self, var_type(&self), obj);  /* replace superinstance by lowest subinstance */
                     a[1] = self;
                 } else {
                     vm_error(vm, "attribute_error",
@@ -990,8 +995,9 @@ newframe: /* a new call frame */
                 ++var, --argc, mode = 1;
                 goto recall;
             case BE_CLASS:
-                if (be_class_newobj(vm, var_toobj(var), var, ++argc)) {
-                    reg = vm->reg;
+                if (be_class_newobj(vm, var_toobj(var), var, ++argc, mode)) {
+                    reg = vm->reg + mode;
+                    mode = 0;
                     var = RA() + 1; /* to next register */
                     goto recall; /* call constructor */
                 }
@@ -1109,7 +1115,7 @@ static void do_ntvfunc(bvm *vm, bvalue *reg, int argc)
 
 static void do_class(bvm *vm, bvalue *reg, int argc)
 {
-    if (be_class_newobj(vm, var_toobj(reg), reg, ++argc)) {
+    if (be_class_newobj(vm, var_toobj(reg), reg, ++argc, 0)) {
         be_incrtop(vm);
         be_dofunc(vm, reg + 1, argc);
         be_stackpop(vm, 1);

@@ -26,6 +26,7 @@ be_extern_native_module(light);
 be_extern_native_module(gpio);
 be_extern_native_module(energy);
 be_extern_native_module(webserver);
+be_extern_native_module(flash);
 #ifdef USE_LVGL
 be_extern_native_module(lvgl);
 #endif // USE_LVGL
@@ -83,6 +84,7 @@ BERRY_LOCAL const bntvmodule* const be_module_table[] = {
 #ifdef USE_WEBSERVER
     &be_native_module(webserver),
 #endif // USE_WEBSERVER
+    &be_native_module(flash),
 
 
     /* user-defined modules register end */
@@ -94,6 +96,7 @@ extern void be_load_tasmota_ntvlib(bvm *vm);
 extern void be_load_wirelib(bvm *vm);
 extern void be_load_driverlib(bvm *vm);
 extern void be_load_driver_i2c_lib(bvm *vm);
+extern void be_load_md5_lib(bvm *vm);
 
 #ifdef USE_LVGL
 extern void be_load_lvgl_color_lib(bvm *vm);
@@ -112,6 +115,7 @@ BERRY_API void be_load_custom_libs(bvm *vm)
 #endif
     be_load_tasmota_ntvlib(vm);
     be_load_driverlib(vm);
+    be_load_md5_lib(vm);
 #ifdef USE_I2C
     be_load_wirelib(vm);
     be_load_driver_i2c_lib(vm);
