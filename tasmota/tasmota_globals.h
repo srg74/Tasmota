@@ -156,44 +156,6 @@ String EthernetMacAddress(void);
 
 #endif  // ESP32
 
-/*********************************************************************************************\
- * Mandatory defines satisfying disabled defines
-\*********************************************************************************************/
-
-#ifndef ESP8266_1M
-#define USE_UFILESYS
-#define GUI_TRASH_FILE
-#define GUI_EDIT_FILE
-#endif
-
-#ifdef USE_EMULATION_HUE
-#define USE_EMULATION
-#endif
-#ifdef USE_EMULATION_WEMO
-#define USE_EMULATION
-#endif
-
-// Convert legacy slave to client
-#ifdef USE_TASMOTA_SLAVE
-#define USE_TASMOTA_CLIENT
-#endif
-#ifdef USE_TASMOTA_SLAVE_FLASH_SPEED
-#define USE_TASMOTA_CLIENT_FLASH_SPEED USE_TASMOTA_SLAVE_FLASH_SPEED
-#endif
-#ifdef USE_TASMOTA_SLAVE_SERIAL_SPEED
-#define USE_TASMOTA_CLIENT_SERIAL_SPEED USE_TASMOTA_SLAVE_SERIAL_SPEED
-#endif
-
-#ifdef USE_SCRIPT
-#define USE_UNISHOX_COMPRESSION                // Add support for string compression
-#endif
-#ifdef USE_ZIGBEE
-#define USE_UNISHOX_COMPRESSION                // Add support for string compression
-#endif
-#ifdef USE_EMULATION_HUE
-#define USE_UNISHOX_COMPRESSION                // Add support for string compression
-#endif
-
 #ifdef USE_PID
 #define USE_TIMEPROP
 #endif

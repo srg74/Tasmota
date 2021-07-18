@@ -193,15 +193,11 @@ struct {
   char mqtt_client[99];                     // Composed MQTT Clientname
   char mqtt_topic[TOPSZ];                   // Composed MQTT topic
 
-#ifdef ESP8266
 #ifdef PIO_FRAMEWORK_ARDUINO_MMU_CACHE16_IRAM48_SECHEAP_SHARED
   char* log_buffer = nullptr;               // Log buffer in IRAM
 #else
   char log_buffer[LOG_BUFFER_SIZE];         // Log buffer in DRAM
 #endif  // PIO_FRAMEWORK_ARDUINO_MMU_CACHE16_IRAM48_SECHEAP_SHARED
-#else   // Not ESP8266
-  char log_buffer[LOG_BUFFER_SIZE];         // Log buffer in DRAM
-#endif  // ESP8266
 } TasmotaGlobal;
 
 TSettings* Settings = nullptr;
@@ -262,7 +258,6 @@ void setup(void) {
 //  Serial.setRxBufferSize(INPUT_BUFFER_SIZE);  // Default is 256 chars
   TasmotaGlobal.seriallog_level = LOG_LEVEL_INFO;  // Allow specific serial messages until config loaded
 
-#ifdef ESP8266
 #ifdef PIO_FRAMEWORK_ARDUINO_MMU_CACHE16_IRAM48_SECHEAP_SHARED
   ESP.setIramHeap();
   Settings = (TSettings*)malloc(sizeof(TSettings));             // Allocate in "new" 16k heap space
@@ -275,13 +270,20 @@ void setup(void) {
     TasmotaGlobal.log_buffer[0] = '\0';
   }
 #endif  // PIO_FRAMEWORK_ARDUINO_MMU_CACHE16_IRAM48_SECHEAP_SHARED
-#endif  // ESP8266
   if (Settings == nullptr) {
     Settings = (TSettings*)malloc(sizeof(TSettings));
   }
 
 //  AddLog(LOG_LEVEL_INFO, PSTR("ADR: Settings %p, Log %p"), Settings, TasmotaGlobal.log_buffer);
   AddLog(LOG_LEVEL_INFO, PSTR("HDW: %s"), GetDeviceHardware().c_str());
+#ifdef ESP32
+  AddLog(LOG_LEVEL_DEBUG, PSTR("HDW: psramFound=%i CanUsePSRAM=%i"), psramFound(), CanUsePSRAM());
+#endif // ESP32
+#if defined(ESP32) && !defined(HAS_PSRAM_FIX)
+  if (psramFound() && !CanUsePSRAM()) {
+    AddLog(LOG_LEVEL_INFO, PSTR("HDW: PSRAM is disabled, requires specific compilation on this hardware (see doc)"));
+  }
+#endif // ESP32
 
 #ifdef USE_UFILESYS
   UfsInit();  // xdrv_50_filesystem.ino

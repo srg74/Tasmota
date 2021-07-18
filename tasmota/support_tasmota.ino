@@ -837,6 +837,36 @@ bool MqttShowSensor(void)
   XsnsCall(FUNC_JSON_APPEND);
   XdrvCall(FUNC_JSON_APPEND);
 
+  if (TasmotaGlobal.global_update) {
+    if ((TasmotaGlobal.humidity > 0) || !isnan(TasmotaGlobal.temperature_celsius) || (TasmotaGlobal.pressure_hpa != 0)) {
+      uint32_t add_comma = 0;
+      ResponseAppend_P(PSTR(",\"Global\":{"));
+      if (!isnan(TasmotaGlobal.temperature_celsius)) {
+        float t = ConvertTempToFahrenheit(TasmotaGlobal.temperature_celsius);
+        ResponseAppend_P(PSTR("\"" D_JSON_TEMPERATURE "\":%*_f"),
+          Settings->flag2.temperature_resolution, &t);
+        add_comma++;
+      }
+      if (TasmotaGlobal.humidity > 0) {
+        ResponseAppend_P(PSTR("%s\"" D_JSON_HUMIDITY "\":%*_f"),
+          (add_comma)?",":"", Settings->flag2.humidity_resolution, &TasmotaGlobal.humidity);
+        add_comma++;
+      }
+      if (2 == add_comma) {
+        float dewpoint = CalcTempHumToDew(TasmotaGlobal.temperature_celsius, TasmotaGlobal.humidity);
+        ResponseAppend_P(PSTR("%s\"" D_JSON_DEWPOINT "\":%*_f"),
+          (add_comma)?",":"", Settings->flag2.temperature_resolution, &dewpoint);
+      }
+      if (TasmotaGlobal.pressure_hpa != 0) {
+        float p = ConvertPressure(TasmotaGlobal.pressure_hpa);
+        float s = ConvertPressureForSeaLevel(TasmotaGlobal.pressure_hpa);
+        ResponseAppend_P(PSTR("%s\"" D_JSON_PRESSURE "\":%*_f,\"" D_JSON_PRESSUREATSEALEVEL "\":%*_f"),
+          (add_comma)?",":"", Settings->flag2.pressure_resolution, &p, Settings->flag2.pressure_resolution, &s);
+      }
+      ResponseJsonEnd();
+    }
+  }
+
   bool json_data_available = (ResponseLength() - json_data_start);
   if (ResponseContains_P(PSTR(D_JSON_PRESSURE))) {
     ResponseAppend_P(PSTR(",\"" D_JSON_PRESSURE_UNIT "\":\"%s\""), PressureUnit().c_str());
@@ -1765,7 +1795,8 @@ void GpioInit(void)
                      ValidSpiPinUsed(GPIO_ST7789_DC) ||  // ST7789 CS may be omitted so chk DC too
                      ValidSpiPinUsed(GPIO_ST7789_CS) ||
                      (ValidSpiPinUsed(GPIO_SSD1331_CS) && ValidSpiPinUsed(GPIO_SSD1331_DC)) ||
-                     ValidSpiPinUsed(GPIO_SDCARD_CS)
+                     ValidSpiPinUsed(GPIO_SDCARD_CS) ||
+                     ValidSpiPinUsed(GPIO_MCP2515_CS)
                     );
     // If SPI_CS and/or SPI_DC is used they must be valid
     TasmotaGlobal.spi_enabled = (valid_cs) ? SPI_MOSI_MISO : SPI_NONE;

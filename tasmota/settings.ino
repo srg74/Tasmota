@@ -657,6 +657,7 @@ void SettingsLoad(void) {
 
 #ifndef FIRMWARE_MINIMAL
   if ((0 == settings_location) || (Settings->cfg_holder != (uint16_t)CFG_HOLDER)) {  // Init defaults if cfg_holder differs from user settings in my_user_config.h
+//  if ((0 == settings_location) || (Settings->cfg_size != sizeof(TSettings)) || (Settings->cfg_holder != (uint16_t)CFG_HOLDER)) {  // Init defaults if cfg_holder differs from user settings in my_user_config.h
 #ifdef USE_UFILESYS
     if (TfsLoadFile(TASM_FILE_SETTINGS_LKG, (uint8_t*)Settings, sizeof(TSettings)) && (Settings->cfg_crc32 == GetSettingsCrc32())) {
       settings_location = 1;
@@ -1121,7 +1122,7 @@ void SettingsDefaultSet2(void) {
 
   SettingsDefaultWebColor();
 
-  memset(&Settings->monitors, 0xFF, 20);  // Enable all possible monitors, displays and sensors
+  memset(&Settings->sensors, 0xFF, 32);  // Enable all possible sensors
   SettingsEnableAllI2cDrivers();
 
   // Tuya
@@ -1326,7 +1327,7 @@ void SettingsDelta(void) {
     if (Settings->version < 0x09000002) {
       char parameters[32];
       snprintf_P(parameters, sizeof(parameters), PSTR("%d,%d,%d,%d,%d"),
-        Settings->ex_adc_param_type, Settings->ex_adc_param1, Settings->ex_adc_param2, Settings->ex_adc_param3, Settings->mbflag2.data);
+        Settings->ex_adc_param_type, Settings->sensors[0][0], Settings->sensors[0][1], (int)Settings->sensors[0][2], Settings->mbflag2.data);
       SettingsUpdateText(SET_ADC_PARAM1, parameters);
     }
 #endif  // ESP8266
@@ -1359,6 +1360,21 @@ void SettingsDelta(void) {
     }
     if (Settings->version < 0x09040006) {
       Settings->mqtt_wifi_timeout = MQTT_WIFI_CLIENT_TIMEOUT / 100;
+    }
+#ifdef CONFIG_IDF_TARGET_ESP32C3
+    if (Settings->version < 0x09050002) {
+      if (Settings->cfg_size != sizeof(TSettings)) {
+        // Fix onetime Settings layout due to changed ESP32-C3 myio and mytmplt types sizes
+        memmove_P((uint8_t*)&Settings->user_template, (uint8_t*)&Settings->free_esp32c3_3D8, sizeof(TSettings) - 0x3FC);
+        memmove_P((uint8_t*)&Settings->eth_type, (uint8_t*)&Settings->free_esp32c3_42A, sizeof(TSettings) - 0x446);
+        // Reset for future use
+        memset(&Settings->free_esp32c3_3D8, 0x00, sizeof(Settings->free_esp32c3_3D8));
+        memset(&Settings->free_esp32c3_42A, 0x00, sizeof(Settings->free_esp32c3_42A));
+      }
+    }
+#endif
+    if (Settings->version < 0x09050003) {
+      memset(&Settings->sensors, 0xFF, 16);  // Enable all possible sensors
     }
 
     Settings->version = VERSION;

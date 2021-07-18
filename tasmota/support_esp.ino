@@ -464,22 +464,28 @@ uint8_t* FlashDirectAccess(void) {
   return data;
 }
 
+// new function to check whether PSRAM is present and supported (i.e. required pacthes are present)
+bool UsePSRAM(void) {
+  static bool can_use_psram = CanUsePSRAM();
+  return psramFound() && can_use_psram;
+}
+
 void *special_malloc(uint32_t size) {
-  if (psramFound()) {
+  if (UsePSRAM()) {
     return heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   } else {
     return malloc(size);
   }
 }
 void *special_realloc(void *ptr, size_t size) {
-  if (psramFound()) {
+  if (UsePSRAM()) {
     return heap_caps_realloc(ptr, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   } else {
     return realloc(ptr, size);
   }
 }
 void *special_calloc(size_t num, size_t size) {
-  if (psramFound()) {
+  if (UsePSRAM()) {
     return heap_caps_calloc(num, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   } else {
     return calloc(num, size);
@@ -487,7 +493,7 @@ void *special_calloc(size_t num, size_t size) {
 }
 
 float CpuTemperature(void) {
-  return ConvertTemp(temperatureRead());
+  return (float)temperatureRead();  // In Celsius
 }
 
 /*
@@ -507,10 +513,10 @@ String GetDeviceHardware(void) {
 Source: esp-idf esp_system.h and esptool
 
 typedef enum {
-    CHIP_ESP32   = 1, //!< ESP32
-    CHIP_ESP32S2 = 2, //!< ESP32-S2
-    CHIP_ESP32S3 = 4, //!< ESP32-S3
-    CHIP_ESP32C3 = 5, //!< ESP32-C3
+    CHIP_ESP32   = 1,  //!< ESP32
+    CHIP_ESP32S2 = 2,  //!< ESP32-S2
+    CHIP_ESP32S3 = 4,  //!< ESP32-S3
+    CHIP_ESP32C3 = 5,  //!< ESP32-C3
 } esp_chip_model_t;
 
 // Chip feature flags, used in esp_chip_info_t
@@ -628,7 +634,7 @@ typedef struct {
   else if (6 == chip_model) {  // ESP32-S3(beta3)
     return F("ESP32-S3");
   }
-  else if (7 == chip_model) {  // ESP32-C6
+  else if (7 == chip_model) {  // ESP32-C6(beta)
 #ifdef CONFIG_IDF_TARGET_ESP32C6
 /* esptool:
     def get_pkg_version(self):
@@ -650,7 +656,59 @@ typedef struct {
 #endif  // CONFIG_IDF_TARGET_ESP32C6
     return F("ESP32-C6");
   }
+  else if (10 == chip_model) {  // ESP32-H2
+#ifdef CONFIG_IDF_TARGET_ESP32H2
+/* esptool:
+    def get_pkg_version(self):
+        num_word = 3
+        block1_addr = self.EFUSE_BASE + 0x044
+        word3 = self.read_reg(block1_addr + (4 * num_word))
+        pkg_version = (word3 >> 21) & 0x0F
+        return pkg_version
+*/
+    uint32_t chip_ver = REG_GET_FIELD(EFUSE_RD_MAC_SPI_SYS_3_REG, EFUSE_PKG_VERSION);
+    uint32_t pkg_version = chip_ver & 0x7;
+//    uint32_t pkg_version = esp_efuse_get_pkg_ver();
+
+//    AddLog(LOG_LEVEL_DEBUG_MORE, PSTR("HDW: ESP32 Model %d, Revision %d, Core %d, Package %d"), chip_info.model, chip_revision, chip_info.cores, chip_ver);
+
+    switch (pkg_version) {
+      case 0:              return F("ESP32-H2");
+    }
+#endif  // CONFIG_IDF_TARGET_ESP32H2
+    return F("ESP32-H2");
+  }
   return F("ESP32");
+}
+
+/*
+ * ESP32 v1 and v2 needs some special patches to use PSRAM.
+ * Standard Tasmota 32 do not include those patches.
+ * If using ESP32 v1, please add: `-mfix-esp32-psram-cache-issue -lc-psram-workaround -lm-psram-workaround`
+ * 
+ * This function returns true if the chip supports PSRAM natively (v3) or if the 
+ * patches are present.
+ */
+bool CanUsePSRAM(void) {
+#ifdef HAS_PSRAM_FIX
+  return true;
+#endif
+#ifdef CONFIG_IDF_TARGET_ESP32
+  esp_chip_info_t chip_info;
+  esp_chip_info(&chip_info);
+  if ((CHIP_ESP32 == chip_info.model) && (chip_info.revision < 3)) {
+    return false;
+  }
+#if ESP_IDF_VERSION_MAJOR < 4
+  uint32_t chip_ver = REG_GET_FIELD(EFUSE_BLK0_RDATA3_REG, EFUSE_RD_CHIP_VER_PKG);
+  uint32_t pkg_version = chip_ver & 0x7;
+  if ((CHIP_ESP32 == chip_info.model) && (pkg_version >= 6)) {
+    return false;   // support for embedded PSRAM of ESP32-PICO-V3-02 requires esp-idf 4.4
+  }
+#endif // ESP_IDF_VERSION_MAJOR < 4
+
+#endif // CONFIG_IDF_TARGET_ESP32
+  return true;
 }
 
 #endif  // ESP32

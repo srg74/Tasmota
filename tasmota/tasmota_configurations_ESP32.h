@@ -115,10 +115,9 @@
 #define USE_SENDMAIL
 #define USE_ESP32MAIL
 
-#define USE_SCRIPT                               // Add support for script (+17k code)
+#ifndef USE_RULES
+  #define USE_SCRIPT                             // Add support for script (+17k code)
 // Script related defines
-#ifdef USE_SCRIPT
-  #undef USE_RULES
   #define MAXVARS 75
   #define MAXSVARS 15
   #define MAXFILT 10
@@ -133,7 +132,7 @@
   #define SCRIPT_FULL_WEBPAGE
   #define SCRIPT_GET_HTTPS_JP
   #define USE_GOOGLE_CHARTS
-#endif  // USE_SCRIPT
+#endif  // USE_RULES
 #endif  // FIRMWARE_M5STACK_CORE2
 
 /*********************************************************************************************\
@@ -303,6 +302,10 @@
 //#define USE_EZORGB                             // [I2cDriver55] Enable support for EZO's RGB sensor (+0k5 code) - Shared EZO code required for any EZO device (+1k2 code)
 //#define USE_EZOPMP                             // [I2cDriver55] Enable support for EZO's PMP sensor (+0k3 code) - Shared EZO code required for any EZO device (+1k2 code)
 //#define USE_SEESAW_SOIL                        // [I2cDriver56] Enable Capacitice Soil Moisture & Temperature Sensor (I2C addresses 0x36 - 0x39) (+1k3 code)
+//#define USE_MPU_ACCEL                          // [I2cDriver58] Enable MPU6886/MPU9250 - found in M5Stack - support both I2C buses on ESP32 (I2C address 0x68) (+2k code)
+//#define USE_BM8563                             // [I2cDriver59] Enable BM8563 RTC - found in M5Stack - support both I2C buses on ESP32 (I2C address 0x51) (+2k5 code)
+//#define USE_AM2320                             // [I2cDriver60] Enable AM2320 temperature and humidity Sensor (I2C address 0x5C) (+1k code)
+//#define USE_T67XX                              // [I2cDriver61] Enable Telaire T67XX CO2 sensor (I2C address 0x15) (+1k3 code)
 
 //#define USE_MHZ19                                // Add support for MH-Z19 CO2 sensor (+2k code)
 //#define USE_SENSEAIR                             // Add support for SenseAir K30, K70 and S8 CO2 sensor (+2k3 code)
